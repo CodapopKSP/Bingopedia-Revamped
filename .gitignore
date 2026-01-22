@@ -1,0 +1,9 @@
+# Bingopedia Revamp .gitignore
+
+# Environment variables
+.env.local
+.env*.local
+*.env.local
+
+# But allow .env.example as a template
+!.env.example

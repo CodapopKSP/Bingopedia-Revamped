@@ -1,0 +1,15 @@
+{
+  "buildCommand": "cd app && npm run build",
+  "outputDirectory": "app/dist",
+  "rewrites": [
+    {
+      "source": "/api/leaderboard",
+      "destination": "/api/leaderboard"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+
