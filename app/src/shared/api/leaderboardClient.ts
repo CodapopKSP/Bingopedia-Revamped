@@ -4,8 +4,11 @@ import type { LeaderboardEntry } from '../../features/game/types'
 export interface FetchLeaderboardParams {
   limit?: number
   page?: number
-  sortBy?: 'score' | 'time' | 'clicks' | 'createdAt'
+  sortBy?: 'score' | 'time' | 'clicks' | 'createdAt' | 'username'
   sortOrder?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
+  gameType?: 'fresh' | 'linked' | 'all'
 }
 
 export interface FetchLeaderboardResponse {
@@ -30,6 +33,9 @@ export async function fetchLeaderboard(params: FetchLeaderboardParams = {}): Pro
   if (params.page != null) url.searchParams.set('page', String(params.page))
   if (params.sortBy) url.searchParams.set('sortBy', params.sortBy)
   if (params.sortOrder) url.searchParams.set('sortOrder', params.sortOrder)
+  if (params.dateFrom) url.searchParams.set('dateFrom', params.dateFrom)
+  if (params.dateTo) url.searchParams.set('dateTo', params.dateTo)
+  if (params.gameType) url.searchParams.set('gameType', params.gameType)
 
   try {
     const response = await fetch(url.toString())
@@ -87,6 +93,8 @@ export interface SubmitScorePayload {
   score: number
   bingoSquares: string[]
   history: string[]
+  gameId?: string
+  gameType?: 'fresh' | 'linked'
 }
 
 export async function submitScore(payload: SubmitScorePayload): Promise<LeaderboardEntry> {

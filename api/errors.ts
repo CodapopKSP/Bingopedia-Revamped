@@ -11,7 +11,8 @@ export type ErrorCode =
   | 'DATABASE_ERROR'
   | 'NETWORK_ERROR'
   | 'SERVER_ERROR'
-  | 'METHOD_NOT_ALLOWED';
+  | 'METHOD_NOT_ALLOWED'
+  | 'NOT_FOUND';
 
 export interface ApiError {
   error: {

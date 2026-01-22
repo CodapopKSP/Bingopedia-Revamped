@@ -1,13 +1,14 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { loadCuratedArticles } from '../../shared/data/curatedArticles'
 import type { CuratedArticle, CuratedCategory } from '../../shared/data/types'
 import { getCuratedArticleTitle } from '../../shared/data/types'
 import { normalizeTitle } from '../../shared/wiki/normalizeTitle'
 import { resolveRedirect } from '../../shared/wiki/resolveRedirect'
 import { detectWinningCells } from './winDetection'
-import type { GameGridCell, GameState, GridIndex } from './types'
+import type { GameGridCell, GameState } from './types'
 import { GRID_CELL_COUNT, STARTING_POOL_SIZE } from '../../shared/constants'
 import { useGameTimer } from './useGameTimer'
+import { fetchGame, createGame } from '../../shared/api/gamesClient'
 
 /**
  * Creates the initial game state with all values reset to defaults.
@@ -27,6 +28,8 @@ function createInitialState(): GameState {
     articleLoading: false,
     articleHistory: [],
     currentArticleTitle: null,
+    gameId: undefined,
+    gameType: undefined,
   }
 }
 
@@ -143,6 +146,17 @@ function generateBingoSet(
 }
 
 /**
+ * Options for useGameState hook.
+ */
+export interface UseGameStateOptions {
+  /**
+   * Optional callback when a new match is detected.
+   * Called with the article title that was matched.
+   */
+  onMatch?: (articleTitle: string) => void
+}
+
+/**
  * Main game state hook that manages the entire game lifecycle.
  * 
  * Responsibilities:
@@ -153,19 +167,24 @@ function generateBingoSet(
  * - Win detection: triggers when any of the 12 winning lines are completed
  * - History management: maintains article visit order and allows navigation
  * 
+ * @param options - Optional configuration
+ * @param options.onMatch - Callback when a new match is detected
  * @returns A tuple containing:
  *   - [0] Current game state
- *   - [1] Control functions: startNewGame, registerNavigation, setArticleLoading, replaceFailedArticle
+ *   - [1] Control functions: startNewGame, loadGameFromId, createShareableGame, registerNavigation, setArticleLoading, replaceFailedArticle
  */
-export function useGameState(): [
+export function useGameState(options: UseGameStateOptions = {}): [
   GameState,
   {
-    startNewGame: () => void
+    startNewGame: (gameState?: { gridCells: GameGridCell[]; startingArticle: CuratedArticle; gameId?: string; gameType?: 'fresh' | 'linked' }) => Promise<void>
+    loadGameFromId: (gameId: string) => Promise<void>
+    createShareableGame: () => Promise<{ gameId: string; url: string }>
     registerNavigation: (title: string) => Promise<void>
     setArticleLoading: (loading: boolean) => void
     replaceFailedArticle: (title: string) => Promise<void>
   },
 ] {
+  const { onMatch } = options
   const [state, setState] = useState<GameState>(() => createInitialState())
 
   // Use the dedicated timer hook for cleaner separation of concerns
@@ -181,13 +200,69 @@ export function useGameState(): [
     }, []),
   })
 
-  const startNewGame = useMemo(
-    () => async () => {
-      const payload = await loadCuratedArticles()
-      const { categories, groups } = payload
-      const { gridCells, startingArticle } = generateBingoSet(categories, groups)
+  /**
+   * Converts article title strings to CuratedArticle objects.
+   * Used when loading games from API where we only have titles.
+   */
+  const createArticleFromTitle = useCallback((title: string): CuratedArticle => {
+    return { title }
+  }, [])
 
+  const startNewGame = useMemo(
+    () => async (providedGameState?: { gridCells: GameGridCell[]; startingArticle: CuratedArticle; gameId?: string; gameType?: 'fresh' | 'linked' }) => {
+      if (providedGameState) {
+        // Load game from provided state
+        const startingTitle = getCuratedArticleTitle(providedGameState.startingArticle)
+        setState({
+          ...createInitialState(),
+          gameStarted: true,
+          gridCells: providedGameState.gridCells,
+          startingArticle: providedGameState.startingArticle,
+          currentArticleTitle: startingTitle,
+          articleHistory: [startingTitle],
+          timerRunning: false,
+          gameId: providedGameState.gameId,
+          gameType: providedGameState.gameType || 'linked',
+        })
+      } else {
+        // Generate new game
+        const payload = await loadCuratedArticles()
+        const { categories, groups } = payload
+        const { gridCells, startingArticle } = generateBingoSet(categories, groups)
+
+        const startingTitle = getCuratedArticleTitle(startingArticle)
+        setState({
+          ...createInitialState(),
+          gameStarted: true,
+          gridCells,
+          startingArticle,
+          currentArticleTitle: startingTitle,
+          articleHistory: [startingTitle],
+          timerRunning: false,
+          gameType: 'fresh',
+        })
+      }
+    },
+    [],
+  )
+
+  /**
+   * Loads a game state from the API by gameId.
+   * @param gameId - UUID v4 game identifier
+   */
+  const loadGameFromId = useCallback(async (gameId: string) => {
+    try {
+      const gameState = await fetchGame(gameId)
+      
+      // Convert string titles to CuratedArticle objects
+      const gridCells: GameGridCell[] = gameState.gridCells.map((title, index) => ({
+        id: `cell-${index}`,
+        article: createArticleFromTitle(title),
+      }))
+      
+      const startingArticle = createArticleFromTitle(gameState.startingArticle)
       const startingTitle = getCuratedArticleTitle(startingArticle)
+      
       setState({
         ...createInitialState(),
         gameStarted: true,
@@ -196,10 +271,49 @@ export function useGameState(): [
         currentArticleTitle: startingTitle,
         articleHistory: [startingTitle],
         timerRunning: false,
+        gameId: gameState.gameId,
+        gameType: 'linked',
       })
-    },
-    [],
-  )
+    } catch (error) {
+      console.error('Failed to load game:', error)
+      throw error
+    }
+  }, [createArticleFromTitle])
+
+  /**
+   * Creates a shareable game by generating a new game and storing it in the API.
+   * @returns Object with gameId and shareable URL
+   */
+  const createShareableGame = useCallback(async (): Promise<{ gameId: string; url: string }> => {
+    try {
+      // Generate new game
+      const payload = await loadCuratedArticles()
+      const { categories, groups } = payload
+      const { gridCells, startingArticle } = generateBingoSet(categories, groups)
+
+      // Convert to string arrays for API
+      const gridCellTitles = gridCells.map((cell) => getCuratedArticleTitle(cell.article))
+      const startingTitle = getCuratedArticleTitle(startingArticle)
+
+      // Create game in API
+      const createdGame = await createGame({
+        gridCells: gridCellTitles,
+        startingArticle: startingTitle,
+        gameType: 'fresh',
+      })
+
+      // Generate shareable URL
+      const url = `${window.location.origin}${window.location.pathname}?game=${createdGame.gameId}`
+
+      return {
+        gameId: createdGame.gameId,
+        url,
+      }
+    } catch (error) {
+      console.error('Failed to create shareable game:', error)
+      throw error
+    }
+  }, [])
 
   /**
    * Registers a navigation to a new article and checks for matches.
@@ -222,6 +336,7 @@ export function useGameState(): [
 
     // First update: add to history, increment clicks, check direct matches
     let currentGridCells: GameGridCell[] = []
+    const newlyMatchedTitles: string[] = []
     setState((prev) => {
       currentGridCells = prev.gridCells
       const nextClickCount = prev.clickCount + 1
@@ -238,6 +353,7 @@ export function useGameState(): [
           !nextMatched.has(gridTitle)
         ) {
           nextMatched.add(gridTitle)
+          newlyMatchedTitles.push(gridTitle)
         }
       }
 
@@ -264,6 +380,7 @@ export function useGameState(): [
       ),
     )
 
+    const redirectMatchedTitles: string[] = []
     setState((prev) => {
       const nextMatched = new Set(prev.matchedArticles)
       let updated = false
@@ -283,6 +400,7 @@ export function useGameState(): [
         ) {
           nextMatched.add(gridTitle)
           updated = true
+          redirectMatchedTitles.push(gridTitle)
         }
       })
 
@@ -300,6 +418,20 @@ export function useGameState(): [
 
       return prev
     })
+
+    // Call onMatch callback for redirect-based matches
+    if (onMatch && redirectMatchedTitles.length > 0) {
+      redirectMatchedTitles.forEach((matchedTitle) => {
+        onMatch(matchedTitle)
+      })
+    }
+
+    // Call onMatch callback for newly matched articles
+    if (onMatch && newlyMatchedTitles.length > 0) {
+      newlyMatchedTitles.forEach((matchedTitle) => {
+        onMatch(matchedTitle)
+      })
+    }
   }
 
   const setArticleLoading = useCallback((loading: boolean) => {
@@ -432,7 +564,17 @@ export function useGameState(): [
     [getRandomArticle],
   )
 
-  return [state, { startNewGame, registerNavigation, setArticleLoading, replaceFailedArticle }]
+  return [
+    state,
+    {
+      startNewGame,
+      loadGameFromId,
+      createShareableGame,
+      registerNavigation,
+      setArticleLoading,
+      replaceFailedArticle,
+    },
+  ]
 }
 
 

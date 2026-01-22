@@ -14,6 +14,9 @@ interface LeaderboardQuery {
   page?: string;
   sortBy?: SortField;
   sortOrder?: SortOrder;
+  dateFrom?: string;
+  dateTo?: string;
+  gameType?: 'fresh' | 'linked' | 'all';
 }
 
 /**
@@ -21,6 +24,7 @@ interface LeaderboardQuery {
  *
  * @param query - Query parameters from the request
  * @returns Parsed and validated query parameters with defaults applied
+ * @throws Error if date parameters are invalid
  */
 function parseQuery(query: LeaderboardQuery) {
   const limit = Math.max(parseInt(query.limit ?? '10', 10) || 10, 1);
@@ -31,7 +35,36 @@ function parseQuery(query: LeaderboardQuery) {
   const validSortFields: SortField[] = ['score', 'clicks', 'time', 'createdAt', 'username'];
   const sortField: SortField = validSortFields.includes(sortBy) ? sortBy : 'score';
 
-  return { limit, page, sortField, sortOrder };
+  // Parse and validate date parameters
+  let dateFrom: Date | undefined;
+  let dateTo: Date | undefined;
+
+  if (query.dateFrom) {
+    dateFrom = new Date(query.dateFrom);
+    if (isNaN(dateFrom.getTime())) {
+      throw new Error('Invalid dateFrom format. Expected ISO date string (e.g., 2024-01-01T00:00:00Z)');
+    }
+  }
+
+  if (query.dateTo) {
+    dateTo = new Date(query.dateTo);
+    if (isNaN(dateTo.getTime())) {
+      throw new Error('Invalid dateTo format. Expected ISO date string (e.g., 2024-01-31T23:59:59Z)');
+    }
+  }
+
+  // Validate date range
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    throw new Error('dateFrom must be before or equal to dateTo');
+  }
+
+  // Parse and validate gameType
+  const gameType = query.gameType || 'fresh';
+  if (gameType !== 'fresh' && gameType !== 'linked' && gameType !== 'all') {
+    throw new Error("gameType must be 'fresh', 'linked', or 'all'");
+  }
+
+  return { limit, page, sortField, sortOrder, dateFrom, dateTo, gameType };
 }
 
 /**
@@ -78,11 +111,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const collection = await getLeaderboardCollection();
 
     if (req.method === 'GET') {
-      const { limit, page, sortField, sortOrder } = parseQuery(req.query as LeaderboardQuery);
+      let parsedQuery;
+      try {
+        parsedQuery = parseQuery(req.query as LeaderboardQuery);
+      } catch (error) {
+        const err = error as Error;
+        res.status(400).json(
+          createErrorResponse('VALIDATION_ERROR', err.message, { field: 'date', value: req.query })
+        );
+        return;
+      }
+
+      const { limit, page, sortField, sortOrder, dateFrom, dateTo, gameType } = parsedQuery;
       const skip = (page - 1) * limit;
       const sortDirection = sortOrder === 'asc' ? 1 : -1;
 
-      const totalCount = await collection.countDocuments({});
+      // Build date filter
+      const dateFilter: Record<string, unknown> = {};
+      if (dateFrom || dateTo) {
+        dateFilter.createdAt = {};
+        if (dateFrom) {
+          dateFilter.createdAt.$gte = dateFrom;
+        }
+        if (dateTo) {
+          dateFilter.createdAt.$lte = dateTo;
+        }
+      }
+
+      // Build gameType filter
+      if (gameType !== 'all') {
+        dateFilter.gameType = gameType;
+      }
+
+      const totalCount = await collection.countDocuments(dateFilter);
       const totalPages = Math.ceil(totalCount / limit);
 
       const sortObj: Record<string, 1 | -1> = { [sortField]: sortDirection };
@@ -91,7 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const users = (await collection
-        .find({})
+        .find(dateFilter)
         .sort(sortObj)
         .skip(skip)
         .limit(limit)
@@ -114,7 +175,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
-      const { username, score, time, clicks, bingoSquares, history } = req.body || {};
+      const { username, score, time, clicks, bingoSquares, history, gameId, gameType } = req.body || {};
 
       if (!username || score === undefined) {
         res.status(400).json(
@@ -151,6 +212,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
 
+      // Validate gameType if provided
+      const validGameType = gameType === 'linked' ? 'linked' : 'fresh';
       const entry: LeaderboardEntry = {
         username: usernameValidation.username,
         score: scoreValidation.score,
@@ -159,6 +222,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         bingoSquares: Array.isArray(bingoSquares) ? bingoSquares.map(String) : [],
         history: Array.isArray(history) ? history.map(String) : [],
         createdAt: new Date(),
+        ...(gameId && { gameId: String(gameId) }),
+        gameType: validGameType,
       };
 
       const result = await collection.insertOne(entry);

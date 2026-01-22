@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--overlay-modal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -13,7 +13,7 @@
 }
 
 .bp-game-details-content {
-  background: #1e293b;
+  background: var(--bg-input);
   border-radius: 0.75rem;
   max-width: 900px;
   width: 100%;
@@ -35,7 +35,7 @@
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 1rem;
   padding: 1rem;
-  background: rgba(15, 23, 42, 0.7);
+  background: var(--bg-panel);
   border-radius: 0.5rem;
 }
 
@@ -47,19 +47,19 @@
 
 .bp-game-details-stat-label {
   font-size: 0.85rem;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .bp-game-details-stat-value {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #e2e8f0;
+  color: var(--text-secondary);
 }
 
 .bp-game-details-tabs {
   display: flex;
   gap: 0.5rem;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  border-bottom: 1px solid var(--border-primary);
   padding: 0 1rem;
 }
 
@@ -67,7 +67,7 @@
   background: none;
   border: none;
   padding: 0.75rem 1rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 0.9rem;
   border-bottom: 2px solid transparent;
@@ -76,12 +76,12 @@
 }
 
 .bp-game-details-tab:hover {
-  color: #cbd5e1;
+  color: var(--text-secondary);
 }
 
 .bp-game-details-tab--active {
-  color: #93c5fd;
-  border-bottom-color: #93c5fd;
+  color: var(--link-focus);
+  border-bottom-color: var(--link-focus);
 }
 
 .bp-game-details-content-area {
@@ -103,9 +103,44 @@
 
 .bp-game-details-empty {
   text-align: center;
-  color: #94a3b8;
+  color: var(--text-muted);
   padding: 2rem;
   font-style: italic;
+}
+
+.bp-game-details-actions {
+  padding: 0 1rem 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+.bp-replay-button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: linear-gradient(135deg, var(--button-blue-bg), var(--button-blue-hover));
+  color: var(--button-blue-text);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.bp-replay-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
+  filter: brightness(1.05);
+}
+
+.bp-replay-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.bp-replay-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 @media (max-width: 768px) {

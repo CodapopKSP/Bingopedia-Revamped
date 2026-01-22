@@ -25,6 +25,9 @@ Retrieves a paginated list of leaderboard entries with optional sorting.
 | `page` | number | `1` | Page number (1-indexed, minimum: 1) |
 | `sortBy` | string | `score` | Field to sort by: `score`, `clicks`, `time`, `createdAt`, `username` |
 | `sortOrder` | string | `desc` | Sort direction: `asc` or `desc` |
+| `dateFrom` | string | - | ISO date string for start of date range (e.g., `2024-01-01T00:00:00Z`) |
+| `dateTo` | string | - | ISO date string for end of date range (e.g., `2024-01-31T23:59:59Z`) |
+| `gameType` | string | `fresh` | Filter by game type: `fresh`, `linked`, or `all` |
 
 #### Response (200 OK)
 
@@ -39,7 +42,9 @@ Retrieves a paginated list of leaderboard entries with optional sorting.
       "clicks": 25,
       "bingoSquares": ["Article1", "Article2", "[Found] Article3"],
       "history": ["Starting Article", "Article1", "Article2"],
-      "createdAt": "2024-01-15T10:30:00.000Z"
+      "createdAt": "2024-01-15T10:30:00.000Z",
+      "gameId": "550e8400-e29b-41d4-a716-446655440000",
+      "gameType": "fresh"
     }
   ],
   "pagination": {
@@ -70,6 +75,21 @@ curl "http://localhost:3001/api/leaderboard?limit=20&page=2&sortBy=time&sortOrde
 **Get entries sorted by clicks:**
 ```bash
 curl "http://localhost:3001/api/leaderboard?sortBy=clicks&sortOrder=desc"
+```
+
+**Get entries from January 2024:**
+```bash
+curl "http://localhost:3001/api/leaderboard?dateFrom=2024-01-01T00:00:00Z&dateTo=2024-01-31T23:59:59Z"
+```
+
+**Get only linked games:**
+```bash
+curl "http://localhost:3001/api/leaderboard?gameType=linked"
+```
+
+**Get all games from past 7 days:**
+```bash
+curl "http://localhost:3001/api/leaderboard?dateFrom=2024-01-08T00:00:00Z&dateTo=2024-01-15T23:59:59Z&gameType=all"
 ```
 
 #### Tie-Breaking
@@ -106,6 +126,8 @@ Submits a new leaderboard entry.
 - `clicks` (number): Number of clicks/navigations (defaults to 0, must be non-negative)
 - `bingoSquares` (string[]): Array of grid article titles (defaults to empty array)
 - `history` (string[]): Array of visited article titles in order (defaults to empty array)
+- `gameId` (string): UUID of the game state (for linked/replayed games)
+- `gameType` (string): Type of game: `fresh` or `linked` (defaults to `fresh`)
 
 #### Response (201 Created)
 
@@ -172,6 +194,7 @@ All error responses follow a consistent structured format:
 | `NETWORK_ERROR` | Network-related error | 500 |
 | `SERVER_ERROR` | General server error | 500 |
 | `METHOD_NOT_ALLOWED` | HTTP method not supported | 405 |
+| `NOT_FOUND` | Resource not found | 404 |
 
 ### 400 Bad Request
 
@@ -295,6 +318,137 @@ If connections consistently timeout, check network connectivity and MongoDB Atla
 
 ---
 
+## Games API Endpoints
+
+### POST /api/games
+
+Creates a new game state that can be shared or replayed.
+
+#### Request Body
+
+```json
+{
+  "gridCells": ["Article1", "Article2", ..., "Article25"],
+  "startingArticle": "Starting Article Title",
+  "gameType": "fresh",
+  "createdBy": "Player1"
+}
+```
+
+#### Required Fields
+
+- `gridCells` (string[]): Array of exactly 25 article titles for the bingo grid
+- `startingArticle` (string): The starting article title (non-empty)
+- `gameType` (string): Type of game: `fresh` or `linked`
+
+#### Optional Fields
+
+- `createdBy` (string): Username of the game creator
+
+#### Response (201 Created)
+
+Returns the created game state with generated `gameId`:
+
+```json
+{
+  "_id": "507f1f77bcf86cd799439011",
+  "gameId": "550e8400-e29b-41d4-a716-446655440000",
+  "gridCells": ["Article1", "Article2", ..., "Article25"],
+  "startingArticle": "Starting Article Title",
+  "gameType": "fresh",
+  "createdAt": "2024-01-15T10:30:00.000Z",
+  "createdBy": "Player1"
+}
+```
+
+#### Example Request
+
+```bash
+curl -X POST http://localhost:3001/api/games \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gridCells": ["Article1", "Article2", ..., "Article25"],
+    "startingArticle": "Starting Article",
+    "gameType": "fresh",
+    "createdBy": "Player1"
+  }'
+```
+
+#### Validation
+
+- `gridCells` must be an array with exactly 25 elements
+- `startingArticle` must be a non-empty string
+- `gameType` must be either `fresh` or `linked`
+- Invalid data returns 400 with `VALIDATION_ERROR`
+
+---
+
+### GET /api/games/:gameId
+
+Retrieves a game state by gameId.
+
+#### Path Parameters
+
+- `gameId` (string): UUID v4 of the game to retrieve
+
+#### Response (200 OK)
+
+Returns the game state:
+
+```json
+{
+  "gameId": "550e8400-e29b-41d4-a716-446655440000",
+  "gridCells": ["Article1", "Article2", ..., "Article25"],
+  "startingArticle": "Starting Article Title",
+  "gameType": "fresh",
+  "createdAt": "2024-01-15T10:30:00.000Z",
+  "createdBy": "Player1"
+}
+```
+
+#### Example Request
+
+```bash
+curl http://localhost:3001/api/games/550e8400-e29b-41d4-a716-446655440000
+```
+
+#### Error Responses
+
+**404 Not Found** - Game not found:
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Game not found",
+    "details": {
+      "gameId": "550e8400-e29b-41d4-a716-446655440000"
+    }
+  }
+}
+```
+
+**400 Bad Request** - Invalid gameId format:
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid gameId format. Expected UUID v4",
+    "details": {
+      "field": "gameId",
+      "value": "invalid-id"
+    }
+  }
+}
+```
+
+#### Notes
+
+- `gameId` must be a valid UUID v4 format
+- Game states are stored in a separate `games` collection
+- Indexes are created on `gameId` (unique) and `createdAt` for performance
+
+---
+
 ## CORS
 
 The API allows cross-origin requests from any origin (`Access-Control-Allow-Origin: *`). This is appropriate for a public leaderboard API.
@@ -305,6 +459,12 @@ The API allows cross-origin requests from any origin (`Access-Control-Allow-Orig
 
 - The `createdAt` field is automatically set server-side on POST requests
 - The API uses a cached MongoDB connection that is reused across requests for performance
-- Indexes are automatically created on first connection: `{ score: -1, createdAt: 1 }`
+- Indexes are automatically created on first connection:
+  - `{ score: -1, createdAt: 1 }` - For score sorting with tie-breaking
+  - `{ createdAt: -1 }` - For date filtering
+  - `{ createdAt: -1, score: 1 }` - For date filtering with score sorting
+  - `{ gameType: 1, score: 1, createdAt: 1 }` - For game type filtering
 - Bad word masking is minimal and can be extended as needed
+- Date filtering uses UTC timezone (store and query in UTC)
+- Game type defaults to `fresh` if not provided in POST request
 

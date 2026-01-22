@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { GameState } from './types'
 import { BingoGrid } from './BingoGrid'
 import { HistoryPanel } from './HistoryPanel'
@@ -6,6 +6,7 @@ import { ArticleSummaryModal } from './ArticleSummaryModal'
 import { WinModal } from './WinModal'
 import { Confetti } from './Confetti'
 import { ArticleViewer } from '../article-viewer/ArticleViewer'
+import { useTimerDisplay } from './useTimerDisplay'
 import './GameScreen.css'
 
 interface GameScreenProps {
@@ -17,6 +18,7 @@ interface GameScreenProps {
     replaceFailedArticle: (title: string) => Promise<void>
   }
   onBackToStart: () => void
+  onMatchCallbackReady?: (callback: (title: string) => void) => void
 }
 
 /**
@@ -30,35 +32,59 @@ interface GameScreenProps {
  * @param props.controls - Game control functions
  * @param props.onBackToStart - Callback to return to the start screen
  */
-export function GameScreen({ state, controls, onBackToStart }: GameScreenProps) {
-  const { clickCount, elapsedSeconds, gameWon, currentArticleTitle, gridCells, matchedArticles, winningCells, articleHistory, articleLoading } = state
+export function GameScreen({ state, controls, onBackToStart, onMatchCallbackReady }: GameScreenProps) {
+  const { clickCount, elapsedSeconds, gameWon, currentArticleTitle, gridCells, matchedArticles, winningCells, articleHistory, articleLoading, gameId, gameType } = state
   const [summaryModalTitle, setSummaryModalTitle] = useState<string | null>(null)
   const [showWinModal, setShowWinModal] = useState(false)
-  const [showConfetti, setShowConfetti] = useState(false)
+  const [showWinConfetti, setShowWinConfetti] = useState(false)
+  const [showMatchConfetti, setShowMatchConfetti] = useState(false)
   const [bingoBoardOpen, setBingoBoardOpen] = useState(false)
+  
+  // Use debounced timer display to minimize re-renders
+  const displaySeconds = useTimerDisplay(elapsedSeconds)
 
   useEffect(() => {
-    if (gameWon && !showWinModal && !showConfetti) {
-      setShowConfetti(true)
+    if (gameWon && !showWinModal && !showWinConfetti) {
+      setShowWinConfetti(true)
       setShowWinModal(true)
     }
-  }, [gameWon, showWinModal, showConfetti])
+  }, [gameWon, showWinModal, showWinConfetti])
 
-  const handleCellClick = (articleTitle: string) => {
+  const handleMatch = useCallback(() => {
+    // Trigger confetti for new match
+    setShowMatchConfetti(true)
+    // Auto-hide after animation (2 seconds)
+    setTimeout(() => {
+      setShowMatchConfetti(false)
+    }, 2000)
+  }, [])
+
+  // Register the match callback with parent (App.tsx) so it can pass it to useGameState
+  useEffect(() => {
+    if (onMatchCallbackReady) {
+      onMatchCallbackReady(handleMatch)
+    }
+  }, [handleMatch, onMatchCallbackReady])
+
+  const handleCellClick = useCallback((articleTitle: string) => {
     setSummaryModalTitle(articleTitle)
-  }
+  }, [])
 
-  const handleHistoryClick = async (title: string) => {
+  const handleCloseSummaryModal = useCallback(() => {
+    setSummaryModalTitle(null)
+  }, [])
+
+  const handleHistoryClick = useCallback(async (title: string) => {
     await controls.registerNavigation(title)
-  }
+  }, [controls])
 
-  const handleArticleClick = async (title: string) => {
+  const handleArticleClick = useCallback(async (title: string) => {
     await controls.registerNavigation(title)
-  }
+  }, [controls])
 
-  const handleArticleLoadFailure = async (title: string) => {
+  const handleArticleLoadFailure = useCallback(async (title: string) => {
     await controls.replaceFailedArticle(title)
-  }
+  }, [controls])
 
   const formatTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600)
@@ -72,7 +98,8 @@ export function GameScreen({ state, controls, onBackToStart }: GameScreenProps) 
 
   return (
     <div className="bp-game-screen">
-      {showConfetti && <Confetti play={showConfetti} onComplete={() => setShowConfetti(false)} />}
+      {showWinConfetti && <Confetti play={showWinConfetti} onComplete={() => setShowWinConfetti(false)} />}
+      {showMatchConfetti && <Confetti play={showMatchConfetti} onComplete={() => setShowMatchConfetti(false)} />}
       {showWinModal && (
         <WinModal
           clicks={clickCount}
@@ -80,13 +107,15 @@ export function GameScreen({ state, controls, onBackToStart }: GameScreenProps) 
           gridCells={gridCells}
           matchedArticles={matchedArticles}
           articleHistory={articleHistory}
+          gameId={gameId}
+          gameType={gameType}
           onClose={() => setShowWinModal(false)}
         />
       )}
       {summaryModalTitle && (
         <ArticleSummaryModal
           articleTitle={summaryModalTitle}
-          onClose={() => setSummaryModalTitle(null)}
+          onClose={handleCloseSummaryModal}
           onArticleFailure={handleArticleLoadFailure}
         />
       )}
@@ -98,7 +127,7 @@ export function GameScreen({ state, controls, onBackToStart }: GameScreenProps) 
         <div className="bp-game-metrics">
           <span>Clicks: {clickCount}</span>
           <span className={articleLoading ? 'bp-game-timer bp-game-timer--paused' : 'bp-game-timer'}>
-            Time: {formatTime(elapsedSeconds)}
+            Time: {formatTime(displaySeconds)}
           </span>
         </div>
       </div>
@@ -136,7 +165,7 @@ export function GameScreen({ state, controls, onBackToStart }: GameScreenProps) 
             ← New Game
           </button>
           <div className="bp-game-metrics">
-            <span>Time: {formatTime(elapsedSeconds)}</span>
+            <span>Time: {formatTime(displaySeconds)}</span>
             <span>Clicks: {clickCount}</span>
             {gameWon && (
               <span className="bp-game-status bp-game-status--won">

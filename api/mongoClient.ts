@@ -12,6 +12,17 @@ export interface LeaderboardEntry {
   bingoSquares: string[];
   history: string[];
   createdAt: Date;
+  gameId?: string; // Optional for backward compatibility
+  gameType?: 'fresh' | 'linked'; // Optional, defaults to 'fresh'
+}
+
+export interface GameState {
+  gameId: string; // UUID v4
+  gridCells: string[]; // 25 article titles
+  startingArticle: string;
+  gameType: 'fresh' | 'linked';
+  createdAt: Date;
+  createdBy?: string; // Optional username
 }
 
 /**
@@ -57,6 +68,9 @@ export async function getLeaderboardCollection(): Promise<Collection<Leaderboard
 
   try {
     await db.collection(collectionName).createIndex({ score: -1, createdAt: 1 });
+    await db.collection(collectionName).createIndex({ gameType: 1, score: 1, createdAt: 1 });
+    await db.collection(collectionName).createIndex({ createdAt: -1 });
+    await db.collection(collectionName).createIndex({ createdAt: -1, score: 1 });
   } catch (error) {
     console.log('Index creation note:', (error as Error).message);
   }
@@ -65,6 +79,60 @@ export async function getLeaderboardCollection(): Promise<Collection<Leaderboard
   cachedDb = db;
 
   return db.collection<LeaderboardEntry>(collectionName);
+}
+
+/**
+ * Gets or creates a MongoDB collection connection for game states.
+ *
+ * Uses connection caching to reuse existing connections across requests for better performance.
+ * Automatically creates indexes on `gameId` (unique) and `createdAt` for efficient queries.
+ *
+ * @returns Promise that resolves to the games collection
+ * @throws {Error} If MongoDB configuration is missing or connection fails
+ *
+ * @remarks
+ * - Connection is cached and reused across requests
+ * - Connection health is checked with a ping before reuse
+ * - If connection fails, a new connection is established
+ * - Index creation is attempted but errors are logged, not thrown
+ *
+ * @example
+ * ```typescript
+ * const collection = await getGamesCollection();
+ * const game = await collection.findOne({ gameId: 'some-uuid' });
+ * ```
+ */
+export async function getGamesCollection(): Promise<Collection<GameState>> {
+  if (cachedClient && cachedDb) {
+    try {
+      await cachedDb.command({ ping: 1 });
+      return cachedDb.collection<GameState>('games');
+    } catch {
+      cachedClient = null;
+      cachedDb = null;
+    }
+  }
+
+  const { uri, dbName } = getMongoConfig();
+  const client = new MongoClient(uri, {
+    serverSelectionTimeoutMS: 10000,
+    connectTimeoutMS: 10000,
+  });
+
+  await client.connect();
+  const db = client.db(dbName);
+
+  try {
+    await db.collection('games').createIndex({ gameId: 1 }, { unique: true });
+    await db.collection('games').createIndex({ createdAt: -1 });
+  } catch (error) {
+    console.log('Index creation note:', (error as Error).message);
+  }
+
+  cachedClient = client;
+  cachedDb = db;
+
+  return db.collection<GameState>('games');
 }
 
 

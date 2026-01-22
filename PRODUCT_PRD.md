@@ -68,7 +68,8 @@ Bingopedia is a web-based game that combines Wikipedia exploration with bingo me
 - View visited articles history and jump back to previous articles.
 - Upon winning, see performance stats and optionally submit score to leaderboard.
 - Browse top scores, sort and paginate leaderboard entries.
- - (Future) Play or replay specific boards shared via links or daily challenges.
+- Play or replay specific boards shared via links (replay feature).
+- Toggle between light and dark themes.
 
 ---
 
@@ -79,12 +80,14 @@ Bingopedia is a web-based game that combines Wikipedia exploration with bingo me
 #### 4.1 Entry / Start Screen
 
 - **Content**
-  - Title: **“Wikipedia Bingo”**.
+  - Title: **"Wikipedia Bingo"**.
   - Short, friendly description of how the game works, emphasizing:
     - 5×5 grid of article titles.
     - You start from a given article and navigate only via Wikipedia links.
     - Win with 5 in a row (row/column/diagonal).
-  - **Primary CTA**: “Start Game”.
+  - **Primary CTA**: "Start Game".
+  - **Theme toggle**: Light/dark mode switcher (accessible from all screens).
+  - **New Game Generator**: Section for creating shareable game links (see FR18).
   - **Leaderboard** section visible below the fold or alongside the CTA (depending on viewport width).
 
 - **Behavior**
@@ -176,6 +179,7 @@ Bingopedia is a web-based game that combines Wikipedia exploration with bingo me
 #### 4.8 Confetti & Delight
 
 - Confetti animation:
+  - Triggers **immediately when a grid cell is matched** (when user checks off a box).
   - Triggers **once per newly matched article** (not on repeated re-visits of a matched cell).
   - Full-screen overlay but non-interactive (no impact on clicks).
   - Plays briefly and then self-cleans (no performance leaks).
@@ -187,17 +191,31 @@ Bingopedia is a web-based game that combines Wikipedia exploration with bingo me
   - Prominently embedded in start screen (primary attraction alongside the Start Game CTA).
   - Optional: accessible from game screen (secondary) if space allows.
 - Content:
-  - Table with columns: Rank, Username, Clicks, Time, Date.
-  - Sorting:
-    - Clicks and Time: default ascending (lower is better).
-    - Potential support for sorting by score or createdAt as needed; UX prioritizes **simplicity** (likely keep sort affordance limited to clicks/time).
+  - Table with columns: Rank, Username, Score, Clicks, Time, Date.
+  - **Date column**: Shows formatted date/time of game completion (e.g., "Jan 15, 2024" or relative time).
+  - **Sorting controls**:
+    - Sort by: Score (default), Clicks, Time, Date.
+    - Sort order: Ascending/Descending toggle (lower is better for score/clicks/time).
+    - Sort controls visible and accessible via dropdown or column headers.
+  - **Time filter options**:
+    - "Best Today" - scores from last 24 hours.
+    - "Best Past 7 Days" - scores from last week.
+    - "Best Past 30 Days" - scores from last month.
+    - "Best Past Year" - scores from last year.
+    - "All Time" - all scores (default).
+  - **Game type filter**:
+    - "Fresh Games" - truly random games (default behavior).
+    - "Linked Games" - games played from shareable links (replays, shared boards).
+    - Filter toggle or dropdown to switch between views.
   - Pagination:
     - Default page size: 10.
-    - “Previous” / “Next” controls.
+    - "Previous" / "Next" controls.
 - Row click (username):
   - Opens a **read‑only game details modal** showing:
-    - User’s bingo squares with [Found] marks, where each bingo square can be clicked to open the same article summary modal used during gameplay.
-    - Summary stats.
+    - User's bingo squares with [Found] marks.
+    - **Clickable bingo squares**: Each bingo square can be clicked to open the same article summary modal used during gameplay, showing the article summary.
+    - Summary stats (score, clicks, time, date).
+    - **Replay button**: Allows user to start a new game with the same board and starting article.
     - Full article history for that run (even if long), potentially scrollable.
 
 ---
@@ -253,8 +271,8 @@ Bingopedia is a web-based game that combines Wikipedia exploration with bingo me
   - After each navigation:
     - Compute canonical forms of clicked and grid titles.
     - If a grid article matches:
-      - Add the grid article’s title to `matchedArticles` set.
-      - Only trigger confetti when the match is **new**.
+      - Add the grid article's title to `matchedArticles` set.
+      - **Immediately trigger confetti animation** when the match is **new** (when user checks off a box).
     - If no grid article matches, do nothing beyond logging (for debugging).
 
 #### 5.3 Winning Logic & Scoring
@@ -328,6 +346,90 @@ Bingopedia is a web-based game that combines Wikipedia exploration with bingo me
     - Do not reject submissions outright; instead mask or obfuscate detected profanities (e.g., replace characters with random symbols).
     - Be careful not to over-filter or break links/URLs should they appear, though usernames are not expected to contain links.
 
+#### 5.6 Theme & Accessibility
+
+- **FR15 – Light mode support**
+  - Theme toggle accessible from all screens (start screen, game screen, leaderboard).
+  - Toggle persists user preference (localStorage or similar).
+  - Light mode provides:
+    - Light background colors with sufficient contrast.
+    - Dark text on light backgrounds.
+    - Maintains all visual states (matched cells, winning lines, etc.) with appropriate light-mode colors.
+  - Default to system preference if available, otherwise default to dark mode.
+
+#### 5.7 Game Sharing & Replay
+
+- **FR16 – Game state persistence**
+  - When a game is generated (fresh or from link), store game state in database:
+    - Grid cells (25 articles).
+    - Starting article.
+    - Game type: "fresh" (random) or "linked" (from shareable link).
+    - Unique game ID or shareable token.
+    - Created timestamp.
+  - Game state must be retrievable by ID/token for replay.
+
+- **FR17 – Shareable game links**
+  - On start screen, provide "Create New Game" section:
+    - Button to generate a new game and create a shareable link.
+    - Link format: `{domain}/play/{gameId}` or `{domain}/?game={gameId}`.
+    - Link can be copied to clipboard.
+    - Link can be shared with others.
+  - When a user visits a shareable link:
+    - Load the specific game state (grid + starting article).
+    - Start game with that exact board.
+    - Game type is marked as "linked" for leaderboard filtering.
+
+- **FR18 – Replay feature**
+  - In game details modal (from leaderboard):
+    - "Replay" button visible.
+    - Clicking "Replay":
+      - Loads the exact game state (grid + starting article) from that leaderboard entry.
+      - Starts a new game session with that board.
+      - Game type is marked as "linked" for leaderboard filtering.
+      - User can play the same board and compete fairly with others who replay it.
+
+#### 5.8 Enhanced Leaderboard Features
+
+- **FR19 – Leaderboard date display**
+  - All leaderboard entries display formatted date/time:
+    - Format: "MMM DD, YYYY" or relative time ("2 days ago").
+    - Date column sortable and visible in all views.
+
+- **FR20 – Leaderboard sorting**
+  - Support sorting by:
+    - Score (default, ascending - lower is better).
+    - Clicks (ascending - lower is better).
+    - Time (ascending - lower is better).
+    - Date (descending - newer first, or ascending - older first).
+  - Sort controls accessible via UI (dropdown or column headers).
+  - Sort state persists during session.
+
+- **FR21 – Leaderboard time filters**
+  - Filter options:
+    - Best Today (last 24 hours).
+    - Best Past 7 Days.
+    - Best Past 30 Days.
+    - Best Past Year.
+    - All Time (default).
+  - Filters apply to leaderboard queries via API parameters.
+  - Filter state persists during session.
+
+- **FR22 – Leaderboard game type separation**
+  - Leaderboard entries include `gameType` field: "fresh" or "linked".
+  - API supports filtering by `gameType` parameter.
+  - UI provides toggle or dropdown to switch between:
+    - "Fresh Games" - only random games.
+    - "Linked Games" - only games from shareable links/replays.
+    - "All Games" - both types combined.
+  - Default view shows "Fresh Games" to maintain competitive integrity.
+  - Linked games are separated to prevent speedrun advantages from replaying known boards.
+
+- **FR23 – Game details article summaries**
+  - In game details modal:
+    - Each bingo square (matched or unmatched) is clickable.
+    - Clicking a square opens the article summary modal (same component used during gameplay).
+    - Summary modal shows read-only article content for that grid cell.
+
 ---
 
 ### 6. Data & Integration Requirements
@@ -351,9 +453,26 @@ Bingopedia is a web-based game that combines Wikipedia exploration with bingo me
 
 - **Storage**: MongoDB `bingopedia.leaderboard`.
 - **Fields**:
-  - `username`, `score`, `time`, `clicks`, `bingoSquares[]`, `history[]`, `createdAt`.
+  - `username`, `score`, `time`, `clicks`, `bingoSquares[]`, `history[]`, `createdAt`, `gameType` ("fresh" or "linked"), `gameId` (reference to shared game if linked).
 - **Indices**:
   - Index on `score` (descending) at minimum.
+  - Index on `createdAt` for time-based filtering.
+  - Index on `gameType` for game type filtering.
+  - Compound index on `(gameType, score, createdAt)` for efficient filtered queries.
+
+#### 6.4 Game State Storage
+
+- **Storage**: MongoDB `bingopedia.games` (new collection).
+- **Fields**:
+  - `gameId` (unique identifier, can be used in shareable URLs).
+  - `gridCells[]` (25 article titles).
+  - `startingArticle` (article title).
+  - `gameType` ("fresh" or "linked").
+  - `createdAt` (timestamp).
+  - `createdBy` (optional: username if from leaderboard replay).
+- **Indices**:
+  - Unique index on `gameId`.
+  - Index on `createdAt` for cleanup/archival.
 
 ---
 
@@ -389,10 +508,17 @@ Bingopedia is a web-based game that combines Wikipedia exploration with bingo me
 
 - Keyboard navigable:
   - Start button, leaderboard controls, grid cells, history items, modals.
+  - Theme toggle accessible via keyboard.
+  - Article viewer maintains scroll position when navigating (no auto-scroll to top on timer ticks).
 - Screen-reader friendly labels:
-  - Buttons and icons (grid toggle, close icons).
-- Color choices must preserve contrast; matched vs. winning states distinguishable with more than color if feasible.
- - Aim for **“reasonably functional”** accessibility that makes the game enjoyable for keyboard and screen-reader users, without attempting full WCAG certification in this phase.
+  - Buttons and icons (grid toggle, close icons, theme toggle).
+- Color choices must preserve contrast in both light and dark modes; matched vs. winning states distinguishable with more than color if feasible.
+- **Critical bug fix**: Timer/state management must not cause UI resets:
+  - Article viewer must maintain scroll position when timer ticks.
+  - Bingo grid cell summary modals must not close/reset on timer ticks.
+  - Tab navigation through articles must not reset to top of article.
+  - State updates should be debounced or batched to prevent unnecessary re-renders.
+ - Aim for **"reasonably functional"** accessibility that makes the game enjoyable for keyboard and screen-reader users, without attempting full WCAG certification in this phase.
 
 #### 7.5 Analytics (Minimum)
 
@@ -431,6 +557,12 @@ Bingopedia is a web-based game that combines Wikipedia exploration with bingo me
   - Edge-case coverage: redirects, missing pages, occupation constraints.
   - E2E tests of full flow.
   - Load and error testing of leaderboard.
+- **Phase 4 – Polish & New Features** (Current Phase)
+  - Fix timer/state reset bugs (critical).
+  - Light mode implementation.
+  - Enhanced leaderboard features (sorting, filtering, date display).
+  - Game sharing and replay functionality.
+  - Confetti animation on match confirmation.
 
 ---
 

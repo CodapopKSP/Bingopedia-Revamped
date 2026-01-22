@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, memo } from 'react'
 import { fetchArticleSummary } from '../../shared/wiki/wikipediaClient'
 import './ArticleSummaryModal.css'
 
@@ -14,16 +14,24 @@ interface ArticleSummaryModalProps {
  * Fetches and displays a short text summary of the article when a bingo grid cell is clicked.
  * Handles loading states, errors, and keyboard navigation (Escape to close).
  * 
+ * Wrapped with React.memo to prevent unnecessary re-renders from timer updates.
+ * 
  * @param props - Component props
  * @param props.articleTitle - The Wikipedia article title to display (null to hide modal)
  * @param props.onClose - Callback when the modal should be closed
  * @param props.onArticleFailure - Optional callback when article fails to load (for replacement logic)
  */
-export function ArticleSummaryModal({ articleTitle, onClose, onArticleFailure }: ArticleSummaryModalProps) {
+function ArticleSummaryModalComponent({ articleTitle, onClose, onArticleFailure }: ArticleSummaryModalProps) {
   const [summary, setSummary] = useState('')
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const failureReportedRef = useRef(new Set<string>())
+  const onArticleFailureRef = useRef(onArticleFailure)
+
+  // Keep ref updated without causing re-renders
+  useEffect(() => {
+    onArticleFailureRef.current = onArticleFailure
+  }, [onArticleFailure])
 
   useEffect(() => {
     if (!articleTitle) return
@@ -39,9 +47,9 @@ export function ArticleSummaryModal({ articleTitle, onClose, onArticleFailure }:
         setSummary('This article could not be loaded. It will be replaced with a new one.')
         setFailed(true)
 
-        if (onArticleFailure && !failureReportedRef.current.has(articleTitle)) {
+        if (onArticleFailureRef.current && !failureReportedRef.current.has(articleTitle)) {
           failureReportedRef.current.add(articleTitle)
-          onArticleFailure(articleTitle)
+          onArticleFailureRef.current(articleTitle)
         }
       } finally {
         setLoading(false)
@@ -49,7 +57,7 @@ export function ArticleSummaryModal({ articleTitle, onClose, onArticleFailure }:
     }
 
     loadSummary()
-  }, [articleTitle, onArticleFailure])
+  }, [articleTitle]) // Removed onArticleFailure from dependencies
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -88,4 +96,7 @@ export function ArticleSummaryModal({ articleTitle, onClose, onArticleFailure }:
     </div>
   )
 }
+
+// Memoize to prevent re-renders from timer updates
+export const ArticleSummaryModal = memo(ArticleSummaryModalComponent)
 

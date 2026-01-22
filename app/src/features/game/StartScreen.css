@@ -13,8 +13,8 @@
 .bp-start-hero {
   padding: 1.5rem;
   border-radius: 1rem;
-  background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.35), rgba(15, 23, 42, 0.9));
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.9);
+  background: radial-gradient(circle at top left, var(--color-blue-accent-rgba), var(--bg-card));
+  box-shadow: 0 24px 60px var(--bg-card);
 }
 
 .bp-start-hero h2 {
@@ -24,7 +24,7 @@
 
 .bp-start-hero p {
   margin: 0 0 1.5rem;
-  color: #cbd5f5;
+  color: var(--text-secondary);
   max-width: 36rem;
 }
 
@@ -38,21 +38,110 @@
   font-weight: 600;
   font-size: 1rem;
   cursor: pointer;
-  background: linear-gradient(135deg, #facc15, #f97316);
-  color: #1f2937;
-  box-shadow: 0 16px 35px rgba(234, 179, 8, 0.5);
+  background: linear-gradient(135deg, var(--button-primary-bg), var(--color-yellow-accent));
+  color: var(--button-primary-text);
+  box-shadow: 0 16px 35px var(--button-primary-shadow);
   transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
 }
 
 .bp-start-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 18px 40px rgba(234, 179, 8, 0.6);
+  box-shadow: 0 18px 40px var(--button-primary-shadow);
   filter: brightness(1.05);
 }
 
 .bp-start-button:active {
   transform: translateY(0);
-  box-shadow: 0 10px 24px rgba(234, 179, 8, 0.4);
+  box-shadow: 0 10px 24px var(--button-primary-shadow);
+}
+
+.bp-start-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.bp-share-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-hover);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.bp-share-button:hover:not(:disabled) {
+  background: var(--bg-card);
+  border-color: var(--border-hover);
+}
+
+.bp-share-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.bp-shareable-link-container {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-panel);
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-secondary);
+}
+
+.bp-shareable-link-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.bp-shareable-link-input-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.bp-shareable-link-input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--border-hover);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.bp-shareable-link-input:focus {
+  outline: 2px solid var(--link-focus);
+  outline-offset: 2px;
+  border-color: var(--link-focus);
+}
+
+.bp-copy-button {
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--border-hover);
+  background: var(--button-blue-bg);
+  color: var(--button-blue-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  white-space: nowrap;
+}
+
+.bp-copy-button:hover {
+  background: var(--button-blue-hover);
+}
+
+.bp-copy-button:active {
+  background: var(--button-blue-hover);
 }
 
 .bp-start-leaderboard-shell {

@@ -34,7 +34,7 @@
   background: none;
   border: none;
   padding: 0;
-  color: #93c5fd;
+  color: var(--link-hover);
   cursor: pointer;
   font-size: 0.9rem;
 }
@@ -47,29 +47,29 @@
   display: flex;
   gap: 1rem;
   font-size: 1rem;
-  color: #cbd5f5;
+  color: var(--text-secondary);
 }
 
 .bp-game-status {
   padding: 0.15rem 0.6rem;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.5);
+  border: 1px solid var(--border-hover);
 }
 
 .bp-game-status--won {
-  border-color: #22c55e;
-  color: #bbf7d0;
+  border-color: var(--status-success);
+  color: var(--status-success-text);
 }
 
 .bp-game-grid-placeholder,
 .bp-game-history-placeholder,
 .bp-game-viewer-placeholder {
   border-radius: 0.75rem;
-  border: 1px dashed rgba(148, 163, 184, 0.5);
+  border: 1px dashed var(--border-hover);
   padding: 1rem;
-  background: rgba(15, 23, 42, 0.7);
+  background: var(--bg-panel);
   font-size: 0.9rem;
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 
 .bp-game-right {
@@ -91,8 +91,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 1rem;
-  background: rgba(15, 23, 42, 0.95);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  background: var(--bg-modal);
+  border-bottom: 1px solid var(--border-primary);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -113,8 +113,8 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: #3b82f6;
-  color: white;
+  background: var(--button-blue-bg);
+  color: var(--button-blue-text);
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
@@ -144,7 +144,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay-mobile);
   z-index: 998;
 }
 
@@ -175,7 +175,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(180deg, rgb(30, 41, 59) 0%, rgb(15, 23, 42) 100%);
+    background: linear-gradient(180deg, var(--bg-input) 0%, var(--bg-panel) 100%);
     z-index: 999;
     padding: 1rem;
     padding-top: 5rem;

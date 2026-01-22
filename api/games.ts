@@ -1,0 +1,145 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { randomUUID } from 'crypto';
+import { getGamesCollection, type GameState } from './mongoClient';
+import { createErrorResponse, handleApiError } from './errors';
+
+/**
+ * Applies CORS headers to the response.
+ * Allows cross-origin requests from any origin for public API access.
+ *
+ * @param res - Vercel response object
+ */
+function applyCors(res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+/**
+ * Validates UUID v4 format.
+ *
+ * @param uuid - UUID string to validate
+ * @returns true if valid UUID v4, false otherwise
+ */
+function isValidUUID(uuid: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
+/**
+ * Vercel serverless function handler for the games API.
+ *
+ * Supports the following endpoints:
+ * - POST /api/games: Creates a new game state
+ * - GET /api/games/:gameId: Retrieves a game state by ID
+ * - OPTIONS: Handles CORS preflight requests
+ *
+ * @param req - Vercel request object
+ * @param res - Vercel response object
+ * @returns Promise that resolves when the response is sent
+ *
+ * @throws {Error} May throw errors for database connection issues or other server errors
+ */
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  applyCors(res);
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  try {
+    const collection = await getGamesCollection();
+
+    if (req.method === 'POST') {
+      const { gridCells, startingArticle, gameType, createdBy } = req.body || {};
+
+      // Validate gridCells
+      if (!Array.isArray(gridCells) || gridCells.length !== 25) {
+        res.status(400).json(
+          createErrorResponse(
+            'VALIDATION_ERROR',
+            'gridCells must be an array with exactly 25 elements',
+            { field: 'gridCells', received: Array.isArray(gridCells) ? gridCells.length : typeof gridCells }
+          )
+        );
+        return;
+      }
+
+      // Validate startingArticle
+      if (!startingArticle || typeof startingArticle !== 'string' || startingArticle.trim().length === 0) {
+        res.status(400).json(
+          createErrorResponse(
+            'VALIDATION_ERROR',
+            'startingArticle must be a non-empty string',
+            { field: 'startingArticle', value: startingArticle }
+          )
+        );
+        return;
+      }
+
+      // Validate gameType
+      if (gameType !== 'fresh' && gameType !== 'linked') {
+        res.status(400).json(
+          createErrorResponse(
+            'VALIDATION_ERROR',
+            "gameType must be either 'fresh' or 'linked'",
+            { field: 'gameType', value: gameType }
+          )
+        );
+        return;
+      }
+
+      // Generate UUID v4 for gameId
+      const gameId = randomUUID();
+
+      const gameState: GameState = {
+        gameId,
+        gridCells: gridCells.map(String),
+        startingArticle: String(startingArticle).trim(),
+        gameType: gameType || 'fresh',
+        createdAt: new Date(),
+        ...(createdBy && { createdBy: String(createdBy).trim() }),
+      };
+
+      const result = await collection.insertOne(gameState);
+      const insertedGame = { ...gameState, _id: result.insertedId };
+
+      res.status(201).json(insertedGame);
+      return;
+    }
+
+    res.setHeader('Allow', 'POST,OPTIONS');
+    res.status(405).json(
+      createErrorResponse(
+        'METHOD_NOT_ALLOWED',
+        `Method ${req.method} not allowed. Allowed methods: GET, POST, OPTIONS`,
+        { method: req.method, allowedMethods: ['GET', 'POST', 'OPTIONS'] }
+      )
+    );
+  } catch (error) {
+    const err = error as Error;
+    console.error('Games API error:', err);
+
+    const context = req.method === 'GET' ? 'GET' : 'POST';
+    const errorResponse = handleApiError(error, context);
+
+    // Determine status code based on error type
+    let status = 500;
+    if (errorResponse.error.code === 'DATABASE_ERROR') {
+      status = 503;
+    } else if (
+      errorResponse.error.code === 'VALIDATION_ERROR' ||
+      errorResponse.error.code === 'MISSING_FIELD' ||
+      errorResponse.error.code === 'NOT_FOUND'
+    ) {
+      status = errorResponse.error.code === 'NOT_FOUND' ? 404 : 400;
+    } else if (errorResponse.error.code === 'METHOD_NOT_ALLOWED') {
+      status = 405;
+    }
+
+    res.status(status).json(errorResponse);
+  }
+}
+

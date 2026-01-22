@@ -18,6 +18,8 @@ following the architecture in `ARCHITECTURE_OVERVIEW.md`.
   npm run dev
   ```
 
+  **Note**: For the leaderboard to work, you also need to run the backend Express server. See the root `README.md` for instructions. The Vite dev server is configured to proxy `/api/leaderboard` requests to the Express server on port 3001.
+
 - **Build for production**
 
   ```bash

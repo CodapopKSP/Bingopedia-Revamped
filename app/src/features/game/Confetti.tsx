@@ -20,31 +20,41 @@ interface ConfettiProps {
 export function Confetti({ play, onComplete }: ConfettiProps) {
   const hasPlayedRef = useRef(false)
   const playerRef = useRef<any>(null)
+  const timeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (play && !hasPlayedRef.current && playerRef.current) {
       hasPlayedRef.current = true
-      if (playerRef.current.seek) {
-        playerRef.current.seek(0.2)
-      } else if (playerRef.current.setFrame) {
-        playerRef.current.setFrame(12)
+      // Try to play the animation
+      if (typeof playerRef.current.play === 'function') {
+        playerRef.current.play()
       }
-      playerRef.current.play()
+      // Set timeout to call onComplete after animation duration (approximately 2 seconds)
+      if (onComplete) {
+        timeoutRef.current = window.setTimeout(() => {
+          onComplete()
+        }, 2000)
+      }
     }
-  }, [play])
-
-  const handleComplete = () => {
-    hasPlayedRef.current = false
-    if (onComplete) {
-      onComplete()
-    }
-  }
+  }, [play, onComplete])
 
   useEffect(() => {
     if (!play) {
       hasPlayedRef.current = false
+      if (timeoutRef.current !== null) {
+        window.clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
     }
   }, [play])
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) {
+        window.clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [])
 
   if (!play) {
     return null
@@ -59,17 +69,7 @@ export function Confetti({ play, onComplete }: ConfettiProps) {
         className="bp-confetti-animation"
         dotLottieRefCallback={(player) => {
           playerRef.current = player
-          if (play && !hasPlayedRef.current && player) {
-            hasPlayedRef.current = true
-            if (player.seek) {
-              player.seek(0.2)
-            } else if (player.setFrame) {
-              player.setFrame(12)
-            }
-            player.play()
-          }
         }}
-        onComplete={handleComplete}
       />
     </div>
   )

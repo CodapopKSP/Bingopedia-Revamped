@@ -75,6 +75,10 @@ export function ArticleViewer({
   const currentLoadingTitleRef = useRef<string | null>(null)
   const onLoadingChangeRef = useRef(onLoadingChange)
   const prevLoadingRef = useRef(loading)
+  // Scroll position preservation
+  const scrollPositionRef = useRef<number>(0)
+  const previousArticleTitleRef = useRef<string | null>(null)
+  const activeElementRef = useRef<Element | null>(null)
 
   // Keep ref updated without causing re-renders
   useEffect(() => {
@@ -96,11 +100,20 @@ export function ArticleViewer({
       setContent('')
       setError(null)
       setLoading(false)
+      previousArticleTitleRef.current = null
       return
     }
 
+    const normalized = normalizeTitle(articleTitle)
+    const articleChanged = previousArticleTitleRef.current !== normalized && previousArticleTitleRef.current !== null
+
+    // Save scroll position and focus before article changes
+    if (articleChanged && contentRef.current) {
+      scrollPositionRef.current = contentRef.current.scrollTop
+      activeElementRef.current = document.activeElement
+    }
+
     const loadArticle = async () => {
-      const normalized = normalizeTitle(articleTitle)
       if (currentLoadingTitleRef.current === normalized) {
         return
       }
@@ -114,6 +127,7 @@ export function ArticleViewer({
         const processed = processHtmlLinks(result.html)
         setContent(processed)
         failureReportedRef.current.delete(articleTitle)
+        previousArticleTitleRef.current = normalized
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load article'
         setError(errorMessage)
@@ -134,6 +148,45 @@ export function ArticleViewer({
     loadArticle()
   }, [articleTitle, onArticleLoadFailure])
 
+  // Restore scroll position and focus when content changes (but only if article hasn't changed)
+  useEffect(() => {
+    if (!contentRef.current || !content || loading || !articleTitle) return
+
+    const normalized = normalizeTitle(articleTitle)
+    const articleUnchanged = previousArticleTitleRef.current === normalized
+
+    // Only restore scroll position if the article hasn't changed
+    // (i.e., this is just a re-render from timer update)
+    if (articleUnchanged && scrollPositionRef.current > 0) {
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        if (contentRef.current) {
+          contentRef.current.scrollTop = scrollPositionRef.current
+
+          // Restore focus if it was within the article content
+          if (activeElementRef.current && contentRef.current.contains(activeElementRef.current)) {
+            ;(activeElementRef.current as HTMLElement).focus()
+          }
+        }
+      })
+    }
+  }, [content, loading, articleTitle])
+
+  // Save scroll position on scroll events
+  useEffect(() => {
+    const container = contentRef.current
+    if (!container) return
+
+    const handleScroll = () => {
+      scrollPositionRef.current = container.scrollTop
+    }
+
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+    }
+  }, [])
+
   useEffect(() => {
     if (!contentRef.current || !content) return
 
@@ -145,7 +198,7 @@ export function ArticleViewer({
       if (!link) return
 
       const href = link.getAttribute('href')
-      if (!isClickableWikiLink(href)) return
+      if (!href || !isClickableWikiLink(href)) return
 
       e.preventDefault()
       e.stopPropagation()

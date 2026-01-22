@@ -7,6 +7,14 @@
       "destination": "/api/leaderboard"
     },
     {
+      "source": "/api/games",
+      "destination": "/api/games"
+    },
+    {
+      "source": "/api/games/:gameId",
+      "destination": "/api/games/[gameId]"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

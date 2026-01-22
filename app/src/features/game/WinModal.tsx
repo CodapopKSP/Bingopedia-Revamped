@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { submitScore } from '../../shared/api/leaderboardClient'
 import type { GameGridCell } from './types'
 import { getCuratedArticleTitle } from '../../shared/data/types'
@@ -11,6 +11,8 @@ interface WinModalProps {
   gridCells: GameGridCell[]
   matchedArticles: Set<string>
   articleHistory: string[]
+  gameId?: string
+  gameType?: 'fresh' | 'linked'
   onClose: () => void
 }
 
@@ -57,6 +59,8 @@ function formatBingoSquares(gridCells: GameGridCell[], matchedArticles: Set<stri
  * Shows final score, time, and clicks. Allows the player to submit their score
  * to the leaderboard with a username. Includes real-time username validation.
  * 
+ * Wrapped with React.memo to prevent unnecessary re-renders from timer updates.
+ * 
  * @param props - Component props
  * @param props.clicks - Total number of clicks/navigations
  * @param props.time - Total elapsed time in seconds
@@ -65,7 +69,7 @@ function formatBingoSquares(gridCells: GameGridCell[], matchedArticles: Set<stri
  * @param props.articleHistory - Array of visited article titles
  * @param props.onClose - Callback when the modal should be closed
  */
-export function WinModal({ clicks, time, gridCells, matchedArticles, articleHistory, onClose }: WinModalProps) {
+function WinModalComponent({ clicks, time, gridCells, matchedArticles, articleHistory, gameId, gameType, onClose }: WinModalProps) {
   const [username, setUsername] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -107,6 +111,8 @@ export function WinModal({ clicks, time, gridCells, matchedArticles, articleHist
         clicks,
         bingoSquares,
         history,
+        ...(gameId && { gameId }),
+        ...(gameType && { gameType }),
       })
 
       setSubmitted(true)
@@ -203,4 +209,7 @@ export function WinModal({ clicks, time, gridCells, matchedArticles, articleHist
     </div>
   )
 }
+
+// Memoize to prevent re-renders from timer updates
+export const WinModal = memo(WinModalComponent)
 

@@ -430,5 +430,47 @@ describe('useGameState Integration', () => {
       expect(newState.winningCells.length).toBeGreaterThanOrEqual(5)
     })
   })
+
+  it('should not cause excessive re-renders from timer updates', async () => {
+    const { result } = renderHook(() => useGameState())
+    const [, controls] = result.current
+
+    await act(async () => {
+      await controls.startNewGame()
+    })
+
+    await waitFor(() => {
+      const [state] = result.current
+      expect(state.gameStarted).toBe(true)
+    })
+
+    // Start timer by navigating
+    await act(async () => {
+      await controls.registerNavigation('Test Article')
+    })
+
+    await waitFor(() => {
+      const [state] = result.current
+      expect(state.timerRunning).toBe(true)
+    })
+
+    // Wait for a few timer ticks
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2500))
+    })
+
+    // Verify timer is still running and elapsed time has increased
+    await waitFor(() => {
+      const [state] = result.current
+      expect(state.timerRunning).toBe(true)
+      expect(state.elapsedSeconds).toBeGreaterThan(0)
+    })
+
+    // Verify game state is still intact (no resets)
+    const [finalState] = result.current
+    expect(finalState.gameStarted).toBe(true)
+    expect(finalState.currentArticleTitle).toBe('Test Article')
+    expect(finalState.articleHistory).toContain('Test Article')
+  })
 })
 

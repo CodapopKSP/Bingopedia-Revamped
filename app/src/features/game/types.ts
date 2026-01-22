@@ -20,6 +20,8 @@ export interface GameState {
   articleLoading: boolean
   articleHistory: string[] // titles in visit order
   currentArticleTitle: string | null
+  gameId?: string // UUID v4 for shareable games
+  gameType?: 'fresh' | 'linked' // 'fresh' for new games, 'linked' for shared/replayed games
 }
 
 /**
@@ -35,6 +37,8 @@ export interface LeaderboardEntry {
   bingoSquares?: string[]
   history?: string[]
   createdAt: string | Date
+  gameId?: string // UUID v4 for replay functionality
+  gameType?: 'fresh' | 'linked' // Game type
 }
 
 /**

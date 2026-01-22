@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
-import type { LeaderboardEntry } from '../game/types'
+import type { LeaderboardEntry, GameGridCell } from '../game/types'
 import { BingoGrid } from '../game/BingoGrid'
 import { HistoryPanel } from '../game/HistoryPanel'
-import { getCuratedArticleTitle } from '../../shared/data/types'
+import { ArticleSummaryModal } from '../game/ArticleSummaryModal'
 import type { CuratedArticle } from '../../shared/data/types'
 import './GameDetailsModal.css'
 
 interface GameDetailsModalProps {
   entry: LeaderboardEntry
   onClose: () => void
+  onReplay?: (gameState: { gridCells: GameGridCell[]; startingArticle: CuratedArticle; gameId?: string; gameType?: 'fresh' | 'linked' }) => Promise<void>
 }
 
 function formatTime(seconds: number): string {
@@ -44,7 +45,6 @@ function parseBingoSquares(bingoSquares: string[]): Array<{ id: string; article:
     // Create a minimal CuratedArticle object
     const article: CuratedArticle = {
       title,
-      category: 'Unknown', // We don't store category in leaderboard
     }
     
     return {
@@ -68,8 +68,10 @@ function parseBingoSquares(bingoSquares: string[]): Array<{ id: string; article:
  * @param props.entry - Leaderboard entry to display
  * @param props.onClose - Callback when the modal should be closed
  */
-export function GameDetailsModal({ entry, onClose }: GameDetailsModalProps) {
+export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<'board' | 'history'>('board')
+  const [summaryModalTitle, setSummaryModalTitle] = useState<string | null>(null)
+  const [isReplaying, setIsReplaying] = useState(false)
   
   const gridCells = entry.bingoSquares ? parseBingoSquares(entry.bingoSquares) : []
   const matchedArticles = new Set<string>()
@@ -89,6 +91,43 @@ export function GameDetailsModal({ entry, onClose }: GameDetailsModalProps) {
   
   const handleClose = () => {
     onClose()
+  }
+
+  const handleCellClick = (articleTitle: string) => {
+    setSummaryModalTitle(articleTitle)
+  }
+
+  const handleReplay = async () => {
+    if (!onReplay) return
+
+    setIsReplaying(true)
+    try {
+      if (entry.gameId) {
+        // Load from gameId - pass gameId and let handler load it
+        await onReplay({
+          gridCells: [], // Will be loaded from API
+          startingArticle: { title: '' }, // Will be loaded from API
+          gameId: entry.gameId,
+          gameType: 'linked',
+        })
+      } else if (entry.bingoSquares && entry.history && entry.history.length > 0) {
+        // Reconstruct from bingoSquares and history
+        const startingArticle: CuratedArticle = {
+          title: entry.history[0],
+        }
+        await onReplay({
+          gridCells,
+          startingArticle,
+          gameType: 'linked',
+        })
+      } else {
+        console.error('Cannot replay: missing gameId, bingoSquares, or history')
+      }
+    } catch (error) {
+      console.error('Failed to replay game:', error)
+    } finally {
+      setIsReplaying(false)
+    }
   }
 
   useEffect(() => {
@@ -133,6 +172,19 @@ export function GameDetailsModal({ entry, onClose }: GameDetailsModalProps) {
               </div>
             )}
           </div>
+          {onReplay && (entry.gameId || (entry.bingoSquares && entry.history && entry.history.length > 0)) && (
+            <div className="bp-game-details-actions">
+              <button
+                type="button"
+                className="bp-replay-button"
+                onClick={handleReplay}
+                disabled={isReplaying}
+                aria-label="Replay this game"
+              >
+                {isReplaying ? 'Loading...' : 'Replay Game'}
+              </button>
+            </div>
+          )}
           
           <div className="bp-game-details-tabs">
             <button
@@ -160,7 +212,7 @@ export function GameDetailsModal({ entry, onClose }: GameDetailsModalProps) {
                   gridCells={gridCells}
                   matchedArticles={matchedArticles}
                   winningCells={winningCells}
-                  onCellClick={() => {}} // Read-only in details view
+                  onCellClick={handleCellClick}
                 />
               </div>
             )}
@@ -186,6 +238,12 @@ export function GameDetailsModal({ entry, onClose }: GameDetailsModalProps) {
           </div>
         </div>
       </div>
+      {summaryModalTitle && (
+        <ArticleSummaryModal
+          articleTitle={summaryModalTitle}
+          onClose={() => setSummaryModalTitle(null)}
+        />
+      )}
     </div>
   )
 }

@@ -49,11 +49,15 @@ docs/archive/            # Archived documentation
 ## Key Commands
 
 ```bash
-# Frontend dev
+# Frontend dev (requires backend to be running for leaderboard)
 cd app && npm run dev
 
-# Backend dev (local Express)
+# Backend dev (local Express) - run this first
 npm run dev:server
+
+# To run both for local development:
+# Terminal 1: npm run dev:server
+# Terminal 2: cd app && npm run dev
 
 # Build
 cd app && npm run build

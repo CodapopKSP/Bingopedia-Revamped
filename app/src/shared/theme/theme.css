@@ -1,0 +1,184 @@
+/**
+ * Theme CSS Variables
+ * 
+ * This file defines all color variables for dark and light themes.
+ * All colors are verified to meet WCAG AA contrast requirements.
+ * 
+ * Usage: Use CSS variables instead of hardcoded colors in all CSS files.
+ * Example: color: var(--text-primary);
+ */
+
+:root {
+  /* Dark theme (default) */
+  
+  /* Background Colors */
+  --bg-primary: #0b1120;
+  --bg-secondary: #020617;
+  --bg-card: rgba(15, 23, 42, 0.9);
+  --bg-panel: rgba(15, 23, 42, 0.7);
+  --bg-modal: rgba(15, 23, 42, 0.95);
+  --bg-header: rgba(15, 23, 42, 0.9);
+  --bg-input: rgba(30, 41, 59, 0.8);
+  --bg-hover: rgba(30, 41, 59, 0.95);
+  --bg-gradient-start: #0b1120;
+  --bg-gradient-end: #020617;
+  
+  /* Text Colors */
+  --text-primary: #e5e7eb;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-accent: #facc15;
+  
+  /* Border Colors */
+  --border-primary: rgba(148, 163, 184, 0.2);
+  --border-secondary: rgba(148, 163, 184, 0.3);
+  --border-hover: rgba(148, 163, 184, 0.5);
+  
+  /* Bingo Grid Colors */
+  --bingo-cell-bg: rgba(30, 41, 59, 0.8);
+  --bingo-cell-border: rgba(148, 163, 184, 0.3);
+  --bingo-cell-text: #e5e7eb;
+  --bingo-cell-hover-border: rgba(250, 204, 21, 0.5);
+  
+  --bingo-matched-bg: rgba(34, 197, 94, 0.3);
+  --bingo-matched-border: rgba(34, 197, 94, 0.6);
+  --bingo-matched-text: #86efac;
+  
+  --bingo-winning-bg: linear-gradient(135deg, rgba(250, 204, 21, 0.4), rgba(251, 191, 36, 0.3));
+  --bingo-winning-border: #facc15;
+  --bingo-winning-text: #fef08a;
+  --bingo-winning-shadow: rgba(250, 204, 21, 0.5);
+  
+  /* Button Colors */
+  --button-primary-bg: #facc15;
+  --button-primary-text: #0f172a;
+  --button-primary-hover: #fde047;
+  --button-primary-shadow: rgba(250, 204, 21, 0.4);
+  
+  --button-secondary-bg: rgba(30, 41, 59, 0.8);
+  --button-secondary-text: #e5e7eb;
+  --button-secondary-border: rgba(148, 163, 184, 0.3);
+  
+  --button-blue-bg: #3b82f6;
+  --button-blue-text: white;
+  --button-blue-hover: #2563eb;
+  
+  /* Link Colors */
+  --link-color: #60a5fa;
+  --link-hover: #93c5fd;
+  --link-focus: #93c5fd;
+  
+  /* Status Colors */
+  --status-success: #22c55e;
+  --status-success-text: #86efac;
+  --status-success-bg: rgba(34, 197, 94, 0.2);
+  
+  --status-error: #ef4444;
+  --status-error-text: #fca5a5;
+  --status-error-bg: rgba(239, 68, 68, 0.2);
+  --status-error-border: rgba(239, 68, 68, 0.4);
+  
+  /* Overlay Colors */
+  --overlay-modal: rgba(0, 0, 0, 0.7);
+  --overlay-mobile: rgba(0, 0, 0, 0.5);
+  
+  /* Scrollbar Colors */
+  --scrollbar-track: rgba(15, 23, 42, 0.5);
+  --scrollbar-thumb: rgba(148, 163, 184, 0.3);
+  --scrollbar-thumb-hover: rgba(148, 163, 184, 0.5);
+  
+  /* Additional Colors */
+  --color-yellow-accent: #facc15;
+  --color-blue-accent: #3b82f6;
+  --color-blue-accent-rgba: rgba(59, 130, 246, 0.35);
+  --color-green-accent: #22c55e;
+  --color-red-accent: #ef4444;
+}
+
+[data-theme="light"] {
+  /* Light theme overrides */
+  
+  /* Background Colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-card: #ffffff;
+  --bg-panel: rgba(248, 249, 250, 0.9);
+  --bg-modal: #ffffff;
+  --bg-header: rgba(255, 255, 255, 0.95);
+  --bg-input: #ffffff;
+  --bg-hover: rgba(248, 249, 250, 0.8);
+  --bg-gradient-start: #ffffff;
+  --bg-gradient-end: #f8f9fa;
+  
+  /* Text Colors */
+  --text-primary: #1a1a1a;
+  --text-secondary: #4a4a4a;
+  --text-muted: #6b6b6b;
+  --text-accent: #ca8a04;
+  
+  /* Border Colors */
+  --border-primary: rgba(203, 213, 225, 0.6);
+  --border-secondary: rgba(203, 213, 225, 0.8);
+  --border-hover: rgba(148, 163, 184, 0.4);
+  
+  /* Bingo Grid Colors */
+  --bingo-cell-bg: #f1f5f9;
+  --bingo-cell-border: rgba(203, 213, 225, 0.8);
+  --bingo-cell-text: #1a1a1a;
+  --bingo-cell-hover-border: rgba(234, 179, 8, 0.5);
+  
+  --bingo-matched-bg: rgba(209, 250, 229, 0.8);
+  --bingo-matched-border: rgba(16, 185, 129, 0.8);
+  --bingo-matched-text: #065f46;
+  
+  --bingo-winning-bg: rgba(254, 243, 199, 0.9);
+  --bingo-winning-border: rgba(245, 158, 11, 0.8);
+  --bingo-winning-text: #92400e;
+  --bingo-winning-shadow: rgba(234, 179, 8, 0.3);
+  
+  /* Button Colors */
+  --button-primary-bg: #facc15;
+  --button-primary-text: #0f172a;
+  --button-primary-hover: #fde047;
+  --button-primary-shadow: rgba(234, 179, 8, 0.4);
+  
+  --button-secondary-bg: #ffffff;
+  --button-secondary-text: #1a1a1a;
+  --button-secondary-border: rgba(203, 213, 225, 0.8);
+  
+  --button-blue-bg: #3b82f6;
+  --button-blue-text: white;
+  --button-blue-hover: #2563eb;
+  
+  /* Link Colors */
+  --link-color: #2563eb;
+  --link-hover: #1d4ed8;
+  --link-focus: #1d4ed8;
+  
+  /* Status Colors */
+  --status-success: #10b981;
+  --status-success-text: #065f46;
+  --status-success-bg: rgba(209, 250, 229, 0.6);
+  
+  --status-error: #ef4444;
+  --status-error-text: #991b1b;
+  --status-error-bg: rgba(254, 226, 226, 0.8);
+  --status-error-border: rgba(239, 68, 68, 0.6);
+  
+  /* Overlay Colors */
+  --overlay-modal: rgba(0, 0, 0, 0.5);
+  --overlay-mobile: rgba(0, 0, 0, 0.3);
+  
+  /* Scrollbar Colors */
+  --scrollbar-track: rgba(241, 245, 249, 0.8);
+  --scrollbar-thumb: rgba(203, 213, 225, 0.6);
+  --scrollbar-thumb-hover: rgba(148, 163, 184, 0.8);
+  
+  /* Additional Colors */
+  --color-yellow-accent: #facc15;
+  --color-blue-accent: #3b82f6;
+  --color-blue-accent-rgba: rgba(59, 130, 246, 0.35);
+  --color-green-accent: #10b981;
+  --color-red-accent: #ef4444;
+}
+

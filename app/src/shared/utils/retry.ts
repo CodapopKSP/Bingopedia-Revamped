@@ -19,7 +19,7 @@ const DEFAULT_OPTIONS: Required<Omit<RetryOptions, 'retryableStatuses'>> & { ret
 /**
  * Determines if an error is retryable
  */
-function isRetryableError(error: unknown, status?: number, retryableStatuses: number[]): boolean {
+function isRetryableError(error: unknown, retryableStatuses: number[], status?: number): boolean {
   // Network errors (fetch failures) are always retryable
   if (error instanceof TypeError && error.message.includes('fetch')) {
     return true
@@ -72,7 +72,7 @@ export async function retry<T>(
 
       // Check if error is retryable
       const status = error instanceof Response ? error.status : undefined
-      const isRetryable = isRetryableError(error, status, opts.retryableStatuses)
+      const isRetryable = isRetryableError(error, opts.retryableStatuses, status)
 
       // Don't retry on last attempt or if error is not retryable
       if (attempt === opts.maxAttempts || !isRetryable) {
