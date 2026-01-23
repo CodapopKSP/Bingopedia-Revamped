@@ -11,8 +11,12 @@ const DB_NAME = 'bingopedia';
 const COLLECTION_NAME = 'leaderboard';
 
 /**
- * Migration script to add gameType field to existing leaderboard entries.
- * Sets gameType to 'fresh' for all entries that don't have it.
+ * Migration script to add gameType field to existing leaderboard entries and update terminology.
+ * 
+ * This script:
+ * 1. Updates terminology: 'fresh' → 'random', 'linked' → 'repeat'
+ * 2. Sets gameType to 'random' for all entries that don't have it
+ * 
  * This script is idempotent (safe to run multiple times).
  */
 async function migrateLeaderboardGameType() {
@@ -35,7 +39,21 @@ async function migrateLeaderboardGameType() {
     const db = client.db(DB_NAME);
     const collection = db.collection(COLLECTION_NAME);
 
-    // Count entries without gameType
+    // Step 1: Update terminology from 'fresh' to 'random'
+    const freshToRandomResult = await collection.updateMany(
+      { gameType: 'fresh' },
+      { $set: { gameType: 'random' } }
+    );
+    console.log(`Updated ${freshToRandomResult.modifiedCount} entries: 'fresh' → 'random'`);
+
+    // Step 2: Update terminology from 'linked' to 'repeat'
+    const linkedToRepeatResult = await collection.updateMany(
+      { gameType: 'linked' },
+      { $set: { gameType: 'repeat' } }
+    );
+    console.log(`Updated ${linkedToRepeatResult.modifiedCount} entries: 'linked' → 'repeat'`);
+
+    // Step 3: Count entries without gameType
     const countBefore = await collection.countDocuments({
       $or: [
         { gameType: { $exists: false } },
@@ -47,23 +65,22 @@ async function migrateLeaderboardGameType() {
 
     if (countBefore === 0) {
       console.log('No migration needed. All entries already have gameType field.');
-      return;
+    } else {
+      // Update all entries that don't have gameType, setting it to 'random'
+      const result = await collection.updateMany(
+        {
+          $or: [
+            { gameType: { $exists: false } },
+            { gameType: null }
+          ]
+        },
+        {
+          $set: { gameType: 'random' }
+        }
+      );
+
+      console.log(`Updated ${result.modifiedCount} entries with gameType: 'random'`);
     }
-
-    // Update all entries that don't have gameType, setting it to 'fresh'
-    const result = await collection.updateMany(
-      {
-        $or: [
-          { gameType: { $exists: false } },
-          { gameType: null }
-        ]
-      },
-      {
-        $set: { gameType: 'fresh' }
-      }
-    );
-
-    console.log(`Updated ${result.modifiedCount} entries with gameType: 'fresh'`);
 
     // Verify migration
     const countAfter = await collection.countDocuments({
@@ -74,7 +91,7 @@ async function migrateLeaderboardGameType() {
     });
 
     if (countAfter === 0) {
-      console.log('✓ Migration completed successfully. All entries now have gameType field.');
+      console.log('✓ Migration completed successfully. All entries now have gameType field with updated terminology.');
     } else {
       console.warn(`⚠ Warning: ${countAfter} entries still missing gameType field.`);
     }

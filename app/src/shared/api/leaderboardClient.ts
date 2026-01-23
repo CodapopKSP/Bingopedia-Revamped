@@ -8,7 +8,7 @@ export interface FetchLeaderboardParams {
   sortOrder?: 'asc' | 'desc'
   dateFrom?: string
   dateTo?: string
-  gameType?: 'fresh' | 'linked' | 'all'
+  gameType?: 'random' | 'repeat' | 'all'
 }
 
 export interface FetchLeaderboardResponse {
@@ -94,7 +94,7 @@ export interface SubmitScorePayload {
   bingoSquares: string[]
   history: string[]
   gameId?: string
-  gameType?: 'fresh' | 'linked'
+  gameType?: 'random' | 'repeat'
 }
 
 export async function submitScore(payload: SubmitScorePayload): Promise<LeaderboardEntry> {

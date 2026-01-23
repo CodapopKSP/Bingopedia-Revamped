@@ -20,8 +20,9 @@ export interface GameState {
   articleLoading: boolean
   articleHistory: string[] // titles in visit order
   currentArticleTitle: string | null
-  gameId?: string // UUID v4 for shareable games
-  gameType?: 'fresh' | 'linked' // 'fresh' for new games, 'linked' for shared/replayed games
+  hashedId?: string // 16-character hashed ID (primary identifier for shareable games)
+  gameId?: string // UUID v4 (optional, for backward compatibility)
+  gameType?: 'random' | 'repeat' // 'random' for new games, 'repeat' for shared/replayed games
 }
 
 /**
@@ -38,7 +39,7 @@ export interface LeaderboardEntry {
   history?: string[]
   createdAt: string | Date
   gameId?: string // UUID v4 for replay functionality
-  gameType?: 'fresh' | 'linked' // Game type
+  gameType?: 'random' | 'repeat' // Game type
 }
 
 /**

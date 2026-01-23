@@ -7,7 +7,7 @@ import type { CuratedArticle } from '../../shared/data/types'
 interface StartScreenProps {
   onStart: () => void | Promise<void>
   onCreateShareableGame?: () => Promise<{ gameId: string; url: string }>
-  onReplay?: (gameState: { gridCells: GameGridCell[]; startingArticle: CuratedArticle; gameId?: string; gameType?: 'fresh' | 'linked' }) => Promise<void>
+  onReplay?: (gameState: { gridCells: GameGridCell[]; startingArticle: CuratedArticle; gameId?: string; hashedId?: string; gameType?: 'random' | 'repeat' }) => Promise<void>
 }
 
 /**

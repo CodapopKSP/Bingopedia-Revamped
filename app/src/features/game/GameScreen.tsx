@@ -7,6 +7,7 @@ import { WinModal } from './WinModal'
 import { Confetti } from './Confetti'
 import { ArticleViewer } from '../article-viewer/ArticleViewer'
 import { useTimerDisplay } from './useTimerDisplay'
+import { formatTime } from '../../shared/utils/timeFormat'
 import './GameScreen.css'
 
 interface GameScreenProps {
@@ -86,16 +87,6 @@ export function GameScreen({ state, controls, onBackToStart, onMatchCallbackRead
     await controls.replaceFailedArticle(title)
   }, [controls])
 
-  const formatTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-    if (hours > 0) {
-      return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
-    }
-    return `${minutes}:${String(secs).padStart(2, '0')}`
-  }
-
   return (
     <div className="bp-game-screen">
       {showWinConfetti && <Confetti play={showWinConfetti} onComplete={() => setShowWinConfetti(false)} />}
@@ -109,6 +100,7 @@ export function GameScreen({ state, controls, onBackToStart, onMatchCallbackRead
           articleHistory={articleHistory}
           gameId={gameId}
           gameType={gameType}
+          hashedId={state.hashedId}
           onClose={() => setShowWinModal(false)}
         />
       )}

@@ -917,6 +917,429 @@ const handleCellClick = (articleTitle: string) => {
 
 ---
 
-**Date**: After backend tasks BE-1 through BE-5 completion, after frontend tasks FE-1 through FE-8 completion  
+### 11. Callback Memoization Pattern for Modal Stability
+**Context**: Fixing modal reload issue where ArticleSummaryModal reloaded every second (Post-Implementation Bug Fix)
+
+**Technique**:
+- Memoize all callbacks passed to modal components using `useCallback`
+- Use refs in modal components to store callbacks (prevents re-renders when callback changes)
+- Remove callbacks from `useEffect` dependency arrays when using refs
+- Create stable close handlers instead of inline functions
+
+**Code Pattern**:
+```typescript
+// In parent component (GameScreen.tsx)
+const handleArticleLoadFailure = useCallback(async (title: string) => {
+  await controls.replaceFailedArticle(title)
+}, [controls])
+
+const handleCloseSummaryModal = useCallback(() => {
+  setSummaryModalTitle(null)
+}, [])
+
+// In modal component (ArticleSummaryModal.tsx)
+const onArticleFailureRef = useRef(onArticleFailure)
+
+useEffect(() => {
+  onArticleFailureRef.current = onArticleFailure
+}, [onArticleFailure])
+
+useEffect(() => {
+  // Load summary
+  if (onArticleFailureRef.current && !failureReportedRef.current.has(articleTitle)) {
+    onArticleFailureRef.current(articleTitle)
+  }
+}, [articleTitle]) // Removed onArticleFailure from dependencies
+```
+
+**Application**: `app/src/features/game/GameScreen.tsx`, `app/src/features/game/ArticleSummaryModal.tsx`
+
+**Key Insight**: Timer ticks cause parent re-renders. If callbacks aren't memoized, they're recreated, causing modal `useEffect` to re-run. Use refs in modals to break the dependency chain.
+
+---
+
+---
+
+## New Backend Skills (BE-BUG-2 through BE-FEAT-3)
+
+### 11. Hashed ID Generation with Collision Handling
+**Context**: Implementing 16-character hashed IDs for shareable games (BE-FEAT-2)
+
+**Technique**:
+- Generate URL-safe hashed IDs using `crypto.randomBytes()` and base64url encoding
+- Use unique index on hashedId to prevent collisions at database level
+- Implement retry logic with max attempts for collision handling
+- Support backward compatibility with UUID v4 lookup
+
+**Code Pattern**:
+```typescript
+function generateHashedId(): string {
+  const bytes = randomBytes(12); // 96 bits
+  return bytes.toString('base64url').substring(0, 16);
+}
+
+// Collision handling with retry
+let hashedId: string;
+let attempts = 0;
+const maxAttempts = 3;
+
+while (attempts < maxAttempts) {
+  hashedId = generateHashedId();
+  try {
+    await collection.insertOne({ hashedId, ... });
+    break; // Success
+  } catch (error) {
+    if (error.message.includes('duplicate key') || error.message.includes('E11000')) {
+      attempts++;
+      if (attempts >= maxAttempts) {
+        // Handle max attempts exceeded
+      }
+      continue; // Retry
+    }
+    throw error; // Re-throw non-collision errors
+  }
+}
+```
+
+**Application**: `api/games.ts`, `api/mongoClient.ts`
+
+**Key Insight**: Use unique database indexes to prevent collisions, but handle them gracefully with retry logic. Base64url encoding provides URL-safe characters without special encoding.
+
+---
+
+### 12. Dual Lookup Pattern for Backward Compatibility
+**Context**: Supporting both hashedId and UUID v4 lookup (BE-FEAT-2)
+
+**Technique**:
+- Validate identifier format (hashedId vs UUID) before querying
+- Try hashedId lookup first (preferred), then fall back to UUID
+- Support both route parameters in Vercel routing
+- Update vercel.json to route both patterns to same handler
+
+**Code Pattern**:
+```typescript
+// Support both route parameters
+const identifier = (req.query.hashedId as string) || (req.query.gameId as string);
+
+// Validate format
+if (isValidHashedId(identifier)) {
+  game = await collection.findOne({ hashedId: identifier });
+}
+// Fallback to UUID for backward compatibility
+if (!game && isValidUUID(identifier)) {
+  game = await collection.findOne({ gameId: identifier });
+}
+```
+
+**Application**: `api/games/[hashedId].ts`, `vercel.json`
+
+**Key Insight**: Support both new and old identifier formats during migration. Validate format before querying to avoid unnecessary database calls.
+
+---
+
+### 13. Non-Blocking Event Logging Pattern
+**Context**: Creating event logging system that doesn't break game flow (BE-FEAT-3)
+
+**Technique**:
+- Wrap logging in try-catch to prevent errors from breaking main flow
+- Always return success response even if logging fails
+- Log errors to console for debugging
+- Use time series collection for efficient event storage
+
+**Code Pattern**:
+```typescript
+try {
+  const collection = await getLoggingCollection();
+  await collection.insertOne({
+    event,
+    timestamp: timestampDate,
+    gameId: gameId || null,
+    hashedId: hashedId || null,
+    ...metadata,
+  });
+} catch (loggingError) {
+  // Log error but don't fail the request (non-blocking)
+  console.error('Logging error (non-blocking):', loggingError);
+}
+
+// Always return success (logging is non-blocking)
+res.status(200).json({ success: true });
+```
+
+**Application**: `api/logging.ts`
+
+**Key Insight**: Event logging should never break the main application flow. Catch and log errors, but always return success to the client. Use separate error handling for logging failures.
+
+---
+
+### 14. Date Range Filtering with End-of-Day Handling
+**Context**: Fixing date range filtering to include all entries on end date (BE-BUG-3)
+
+**Technique**:
+- Extend dateTo to end of day (23:59:59.999) to include all entries on that day
+- Use Date object manipulation to add milliseconds for end of day
+- Document timezone handling (UTC)
+
+**Code Pattern**:
+```typescript
+if (dateTo) {
+  const toDate = dateTo instanceof Date ? dateTo : new Date(dateTo);
+  // Set to end of day (23:59:59.999)
+  const endOfDay = new Date(toDate.getTime() + 86400000 - 1);
+  dateFilter.createdAt.$lte = endOfDay;
+}
+```
+
+**Application**: `api/leaderboard.ts`
+
+**Key Insight**: When filtering by date range, extend the end date to include all entries created on that day. Use millisecond arithmetic for precise end-of-day calculation.
+
+---
+
+### 15. Terminology Migration Pattern
+**Context**: Updating terminology from 'fresh'/'linked' to 'random'/'repeat' (BE-BUG-4)
+
+**Technique**:
+- Update TypeScript types across all files
+- Update validation logic to accept new terminology
+- Create migration script to update existing database entries
+- Keep migration script idempotent (safe to run multiple times)
+
+**Code Pattern**:
+```javascript
+// Migration script updates terminology
+await collection.updateMany(
+  { gameType: 'fresh' },
+  { $set: { gameType: 'random' } }
+);
+
+await collection.updateMany(
+  { gameType: 'linked' },
+  { $set: { gameType: 'repeat' } }
+);
+```
+
+**Application**: `api/mongoClient.ts`, `api/leaderboard.ts`, `api/games.ts`, `scripts/migrateLeaderboardGameType.js`
+
+**Key Insight**: When updating terminology, update all code references first, then run migration script. Make migrations idempotent for safety.
+
+---
+
+**Date**: After backend tasks BE-BUG-2 through BE-FEAT-3 completion  
+**Status**: Skills documented for future reference
+
+---
+
+## QA Fixes Skills (BE-FIX-1, BE-FIX-2, BE-FIX-4)
+
+### 16. Filter Merging Pattern for MongoDB Queries
+**Context**: Fixing time period filter that wasn't working (BE-FIX-4)
+
+**Technique**:
+- Build separate filter objects for different filter types (date, gameType, etc.)
+- Merge filters using object spread operator
+- Use merged filter for both `countDocuments` and `find` queries
+- Avoid mixing filter properties in the same object
+
+**Code Pattern**:
+```typescript
+// Build date filter
+const dateFilter: Record<string, unknown> = {};
+if (dateFrom || dateTo) {
+  dateFilter.createdAt = { $gte: fromDate, $lte: endOfDay };
+}
+
+// Build gameType filter separately
+const gameTypeFilter: Record<string, unknown> = {};
+if (gameType !== 'all') {
+  gameTypeFilter.gameType = gameType;
+}
+
+// Merge filters properly
+const queryFilter = { ...dateFilter, ...gameTypeFilter };
+
+// Use merged filter for both count and find
+const totalCount = await collection.countDocuments(queryFilter);
+const users = await collection.find(queryFilter).toArray();
+```
+
+**Application**: `api/leaderboard.ts`
+
+**Key Insight**: Don't mix different filter types in the same object. Build separate filter objects and merge them. This makes the code clearer and prevents bugs where one filter overwrites another.
+
+---
+
+### 17. Direct API Path Construction Pattern
+**Context**: Fixing 404 errors from fragile URL manipulation (BE-FIX-2)
+
+**Technique**:
+- Use direct absolute paths instead of manipulating base URLs
+- Avoid string replacement on API base URLs (fragile and error-prone)
+- Use `new URL()` constructor with absolute paths
+- Remove dependencies on base URL configuration when not needed
+
+**Code Pattern**:
+```typescript
+// ❌ Fragile approach (avoid)
+const apiBase = getApiBaseUrl().replace('/leaderboard', '')
+const url = new URL(`${apiBase}/games`, window.location.origin)
+
+// ✅ Direct approach (preferred)
+const url = new URL('/api/games', window.location.origin)
+```
+
+**Application**: `app/src/shared/api/gamesClient.ts`
+
+**Key Insight**: When API paths are known and stable, use direct paths instead of manipulating base URLs. This is more reliable and easier to understand. Only use base URL configuration when you need dynamic API endpoints.
+
+---
+
+### 18. Error Response Parsing Pattern
+**Context**: Improving error message extraction from API responses (BE-FIX-2)
+
+**Technique**:
+- Handle structured error responses with nested error objects
+- Use optional chaining to safely access nested properties
+- Provide fallback error messages
+- Handle both structured (`{ error: { message: ... } }`) and simple (`{ message: ... }`) error formats
+
+**Code Pattern**:
+```typescript
+try {
+  const errorData = await response.json()
+  if (errorData.error || errorData.message) {
+    // Handle nested error structure
+    errorMessage = errorData.error?.message || errorData.message || errorMessage
+  }
+} catch {
+  // Fallback for non-JSON responses
+  errorMessage = `Failed (HTTP ${response.status})`
+}
+```
+
+**Application**: `app/src/shared/api/gamesClient.ts`
+
+**Key Insight**: API error responses can have different structures. Use optional chaining and fallbacks to handle both nested and flat error structures safely.
+
+---
+
+**Date**: After QA fixes BE-FIX-1, BE-FIX-2, BE-FIX-4 completion  
+**Status**: Skills documented for future reference
+
+---
+
+### 6. Mobile Viewport Width Constraints Pattern
+**Context**: Fixing mobile horizontal scroll issues (FE-FIX-1.1)
+
+**Technique**:
+- Add `max-width: 100vw` to root containers to prevent overflow
+- Use `width: 100%` with `box-sizing: border-box` to ensure proper sizing
+- Apply constraints at multiple levels (root, main, feature containers)
+- Ensure padding doesn't cause overflow by using `box-sizing: border-box`
+
+**Code Pattern**:
+```css
+/* Root container */
+.bp-app-root {
+  max-width: 100vw;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Main content area */
+.bp-app-main {
+  max-width: 100vw;
+  width: 100%;
+  box-sizing: border-box; /* Include padding in width calculation */
+}
+
+/* Feature containers */
+.bp-start-screen {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+```
+
+**Application**: `app/src/app/AppLayout.css`, `app/src/features/game/StartScreen.css`, `app/src/features/game/GameScreen.css`
+
+**Key Insight**: Mobile viewport overflow is often caused by missing width constraints and padding not being included in box-sizing. Apply constraints at multiple levels for defense in depth.
+
+---
+
+### 7. Fixed Position Scorebar with Content Offset Pattern
+**Context**: Fixing mobile timer/clicks visibility without covering content (FE-FIX-1.2)
+
+**Technique**:
+- Use `position: fixed` for always-visible UI elements (scorebar)
+- Calculate exact height of fixed element (padding + content)
+- Add matching `padding-top` to content areas below fixed element
+- Ensure z-index hierarchy: fixed element > overlay > content
+- Remove negative margins that were used with sticky positioning
+
+**Code Pattern**:
+```css
+/* Fixed scorebar at top */
+.bp-game-scorebar-mobile {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000; /* Above overlay (998) and content (999) */
+  /* Height: ~3.5rem with padding */
+}
+
+/* Content below fixed element */
+.bp-game-left {
+  padding-top: 4.5rem; /* Space for scorebar (3.5rem) + margin (1rem) */
+}
+
+.bp-game-right {
+  padding-top: 3.5rem; /* Space for fixed scorebar */
+}
+```
+
+**Application**: `app/src/features/game/GameScreen.css`
+
+**Key Insight**: Fixed positioning requires explicit spacing in content areas. Calculate exact heights and account for padding/margins. Z-index hierarchy ensures proper layering without covering content.
+
+---
+
+### 8. Mobile Layout Integration vs Overlay Pattern
+**Context**: Integrating scorebar into layout instead of overlaying (FE-FIX-1.2)
+
+**Technique**:
+- Change from `position: sticky` with negative margins to `position: fixed`
+- Remove margin hacks that were compensating for sticky positioning
+- Ensure content areas account for fixed element height
+- Use consistent padding calculations across breakpoints
+
+**Code Pattern**:
+```css
+/* Before: Sticky with margin hack */
+.bp-game-scorebar-mobile {
+  position: sticky;
+  margin: -1rem -1rem 1rem -1rem; /* Hack to extend beyond container */
+}
+
+/* After: Fixed with proper spacing */
+.bp-game-scorebar-mobile {
+  position: fixed;
+  /* No margin hack needed */
+}
+
+/* Content accounts for fixed element */
+.bp-game-left {
+  padding-top: 4.5rem; /* Explicit spacing */
+}
+```
+
+**Application**: `app/src/features/game/GameScreen.css`
+
+**Key Insight**: Fixed positioning is cleaner than sticky with margin hacks. Explicit spacing in content areas is more maintainable and predictable than negative margins.
+
+---
+
+**Date**: After QA fixes FE-FIX-1 completion  
 **Status**: Skills documented for future reference
 

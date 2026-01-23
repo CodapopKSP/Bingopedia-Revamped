@@ -27,9 +27,22 @@ function isValidUUID(uuid: string): boolean {
 }
 
 /**
- * Vercel serverless function handler for GET /api/games/:gameId.
+ * Validates hashed ID format (16 characters, URL-safe).
  *
- * Retrieves a game state by gameId.
+ * @param hashedId - Hashed ID string to validate
+ * @returns true if valid hashed ID format, false otherwise
+ */
+function isValidHashedId(hashedId: string): boolean {
+  // 16 characters, URL-safe base64url characters (A-Z, a-z, 0-9, -, _)
+  const hashedIdRegex = /^[A-Za-z0-9_-]{16}$/;
+  return hashedIdRegex.test(hashedId);
+}
+
+/**
+ * Vercel serverless function handler for GET /api/games/:hashedId.
+ *
+ * Retrieves a game state by hashedId (preferred) or gameId (UUID, for backward compatibility).
+ * Supports both 16-character hashed IDs and UUID v4 format.
  *
  * @param req - Vercel request object
  * @param res - Vercel response object
@@ -59,38 +72,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const collection = await getGamesCollection();
-    const gameId = req.query.gameId as string;
+    // Support both hashedId and gameId route parameters for backward compatibility
+    const identifier = (req.query.hashedId as string) || (req.query.gameId as string);
 
-    if (!gameId) {
+    if (!identifier) {
       res.status(400).json(
         createErrorResponse(
           'MISSING_FIELD',
-          'gameId is required',
-          { field: 'gameId' }
+          'Game identifier (hashedId or gameId) is required',
+          { field: 'hashedId' }
         )
       );
       return;
     }
 
-    if (!isValidUUID(gameId)) {
+    // Validate format: must be either hashedId (16 chars) or UUID v4
+    if (!isValidHashedId(identifier) && !isValidUUID(identifier)) {
       res.status(400).json(
         createErrorResponse(
           'VALIDATION_ERROR',
-          'Invalid gameId format. Expected UUID v4',
-          { field: 'gameId', value: gameId }
+          'Invalid game identifier format. Expected 16-character hashed ID or UUID v4',
+          { field: 'hashedId', value: identifier }
         )
       );
       return;
     }
 
-    const game = await collection.findOne({ gameId });
+    // Try hashedId first (preferred), then fall back to gameId (UUID) for backward compatibility
+    let game = null;
+    if (isValidHashedId(identifier)) {
+      game = await collection.findOne({ hashedId: identifier });
+    }
+    
+    // If not found by hashedId, try UUID (backward compatibility)
+    if (!game && isValidUUID(identifier)) {
+      game = await collection.findOne({ gameId: identifier });
+    }
 
     if (!game) {
       res.status(404).json(
         createErrorResponse(
           'NOT_FOUND',
           'Game not found',
-          { gameId }
+          { identifier }
         )
       );
       return;

@@ -70,6 +70,7 @@ export function ArticleViewer({
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
   const failureReportedRef = useRef(new Set<string>())
   const currentLoadingTitleRef = useRef<string | null>(null)
@@ -272,10 +273,71 @@ export function ArticleViewer({
 
   const displayTitle = articleTitle.replace(/_/g, ' ')
 
+  /**
+   * Handles clicking the "View on Wikipedia" button.
+   * Shows a confirmation modal before opening Wikipedia.
+   */
+  const handleViewOnWikipedia = () => {
+    setShowConfirmModal(true)
+  }
+
+  /**
+   * Confirms opening Wikipedia in a new tab.
+   * Formats the article title for Wikipedia URL and opens it.
+   */
+  const confirmViewOnWikipedia = () => {
+    if (!articleTitle) return
+    
+    // Format title for Wikipedia URL: replace spaces with underscores, encode special characters
+    const formattedTitle = articleTitle.replace(/ /g, '_')
+    const wikipediaUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(formattedTitle)}`
+    
+    // Open in new tab with security attributes
+    window.open(wikipediaUrl, '_blank', 'noopener,noreferrer')
+    setShowConfirmModal(false)
+  }
+
+  /**
+   * Closes the confirmation modal without opening Wikipedia.
+   */
+  const cancelViewOnWikipedia = () => {
+    setShowConfirmModal(false)
+  }
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    if (!showConfirmModal) return
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        cancelViewOnWikipedia()
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [showConfirmModal])
+
   return (
     <div className="bp-article-viewer">
       <div className="bp-article-header">
         <h2 className="bp-article-title">{displayTitle}</h2>
+        {articleTitle && (
+          <button
+            type="button"
+            className="bp-view-wikipedia-button"
+            onClick={handleViewOnWikipedia}
+            aria-label="View this article on Wikipedia"
+            title="View on Wikipedia"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+            View on Wikipedia
+          </button>
+        )}
       </div>
       <div className="bp-article-content" ref={contentRef}>
         {loading && (
@@ -293,6 +355,39 @@ export function ArticleViewer({
           <div className="bp-article-body" dangerouslySetInnerHTML={{ __html: content }} />
         )}
       </div>
+      {showConfirmModal && (
+        <div className="bp-modal-overlay" onClick={cancelViewOnWikipedia}>
+          <div className="bp-modal-content bp-confirm-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="bp-modal-header">
+              <h3 className="bp-modal-title">Leave Game?</h3>
+              <button className="bp-modal-close" onClick={cancelViewOnWikipedia} aria-label="Close">
+                ✕
+              </button>
+            </div>
+            <div className="bp-modal-body">
+              <p>Are you sure? Leaving may clear your game progress.</p>
+              <div className="bp-modal-actions">
+                <button
+                  type="button"
+                  className="bp-button bp-button-secondary"
+                  onClick={cancelViewOnWikipedia}
+                  aria-label="Cancel"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="bp-button bp-button-primary"
+                  onClick={confirmViewOnWikipedia}
+                  aria-label="Continue to Wikipedia"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

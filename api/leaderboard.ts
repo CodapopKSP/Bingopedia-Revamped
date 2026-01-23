@@ -16,11 +16,15 @@ interface LeaderboardQuery {
   sortOrder?: SortOrder;
   dateFrom?: string;
   dateTo?: string;
-  gameType?: 'fresh' | 'linked' | 'all';
+  gameType?: 'random' | 'repeat' | 'all';
 }
 
 /**
  * Parses and validates query parameters for leaderboard requests.
+ *
+ * Default behavior:
+ * - sortOrder defaults to 'asc' (lower scores rank higher)
+ * - When sorting by score, entries with equal scores are sorted by createdAt ascending (earlier dates rank higher)
  *
  * @param query - Query parameters from the request
  * @returns Parsed and validated query parameters with defaults applied
@@ -30,7 +34,8 @@ function parseQuery(query: LeaderboardQuery) {
   const limit = Math.max(parseInt(query.limit ?? '10', 10) || 10, 1);
   const page = Math.max(parseInt(query.page ?? '1', 10) || 1, 1);
   const sortBy: SortField = (query.sortBy as SortField) || 'score';
-  const sortOrder: SortOrder = query.sortOrder === 'asc' ? 'asc' : 'desc';
+  // Default to ascending sort order (lower scores rank higher)
+  const sortOrder: SortOrder = query.sortOrder === 'desc' ? 'desc' : 'asc';
 
   const validSortFields: SortField[] = ['score', 'clicks', 'time', 'createdAt', 'username'];
   const sortField: SortField = validSortFields.includes(sortBy) ? sortBy : 'score';
@@ -59,9 +64,9 @@ function parseQuery(query: LeaderboardQuery) {
   }
 
   // Parse and validate gameType
-  const gameType = query.gameType || 'fresh';
-  if (gameType !== 'fresh' && gameType !== 'linked' && gameType !== 'all') {
-    throw new Error("gameType must be 'fresh', 'linked', or 'all'");
+  const gameType = query.gameType || 'random';
+  if (gameType !== 'random' && gameType !== 'repeat' && gameType !== 'all') {
+    throw new Error("gameType must be 'random', 'repeat', or 'all'");
   }
 
   return { limit, page, sortField, sortOrder, dateFrom, dateTo, gameType };
@@ -127,23 +132,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const sortDirection = sortOrder === 'asc' ? 1 : -1;
 
       // Build date filter
+      // Date filtering uses UTC timezone. dateTo is extended to end of day (23:59:59.999)
+      // to include all entries created on that day.
       const dateFilter: Record<string, unknown> = {};
       if (dateFrom || dateTo) {
         dateFilter.createdAt = {};
         if (dateFrom) {
-          dateFilter.createdAt.$gte = dateFrom;
+          // Ensure dateFrom is a Date object (already validated in parseQuery)
+          const fromDate = dateFrom instanceof Date ? dateFrom : new Date(dateFrom);
+          dateFilter.createdAt.$gte = fromDate;
         }
         if (dateTo) {
-          dateFilter.createdAt.$lte = dateTo;
+          // Set dateTo to end of day (23:59:59.999) to include all entries on that day
+          const toDate = dateTo instanceof Date ? dateTo : new Date(dateTo);
+          const endOfDay = new Date(toDate.getTime() + 86400000 - 1); // Add milliseconds for end of day
+          dateFilter.createdAt.$lte = endOfDay;
         }
       }
 
-      // Build gameType filter
+      // Build gameType filter separately (don't mix with dateFilter)
+      const gameTypeFilter: Record<string, unknown> = {};
       if (gameType !== 'all') {
-        dateFilter.gameType = gameType;
+        gameTypeFilter.gameType = gameType;
       }
 
-      const totalCount = await collection.countDocuments(dateFilter);
+      // Merge filters properly
+      const queryFilter = { ...dateFilter, ...gameTypeFilter };
+
+      const totalCount = await collection.countDocuments(queryFilter);
       const totalPages = Math.ceil(totalCount / limit);
 
       const sortObj: Record<string, 1 | -1> = { [sortField]: sortDirection };
@@ -152,7 +168,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const users = (await collection
-        .find(dateFilter)
+        .find(queryFilter)
         .sort(sortObj)
         .skip(skip)
         .limit(limit)
@@ -212,8 +228,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
 
-      // Validate gameType if provided
-      const validGameType = gameType === 'linked' ? 'linked' : 'fresh';
+      // Validate gameType if provided, default to 'random'
+      const validGameType = gameType === 'repeat' ? 'repeat' : 'random';
       const entry: LeaderboardEntry = {
         username: usernameValidation.username,
         score: scoreValidation.score,

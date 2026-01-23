@@ -3,6 +3,8 @@ import { submitScore } from '../../shared/api/leaderboardClient'
 import type { GameGridCell } from './types'
 import { getCuratedArticleTitle } from '../../shared/data/types'
 import { validateUsername } from '../../shared/utils/validation'
+import { formatTime } from '../../shared/utils/timeFormat'
+import { logEvent } from '../../shared/api/loggingClient'
 import './WinModal.css'
 
 interface WinModalProps {
@@ -12,24 +14,8 @@ interface WinModalProps {
   matchedArticles: Set<string>
   articleHistory: string[]
   gameId?: string
-  gameType?: 'fresh' | 'linked'
+  gameType?: 'random' | 'repeat'
   onClose: () => void
-}
-
-/**
- * Formats elapsed seconds into a readable time string (MM:SS or HH:MM:SS).
- * 
- * @param seconds - Total elapsed seconds
- * @returns Formatted time string
- */
-function formatTime(seconds: number): string {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = seconds % 60
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
-  }
-  return `${minutes}:${String(secs).padStart(2, '0')}`
 }
 
 /**
@@ -69,7 +55,7 @@ function formatBingoSquares(gridCells: GameGridCell[], matchedArticles: Set<stri
  * @param props.articleHistory - Array of visited article titles
  * @param props.onClose - Callback when the modal should be closed
  */
-function WinModalComponent({ clicks, time, gridCells, matchedArticles, articleHistory, gameId, gameType, onClose }: WinModalProps) {
+function WinModalComponent({ clicks, time, gridCells, matchedArticles, articleHistory, gameId, gameType, onClose, hashedId }: WinModalProps & { hashedId?: string }) {
   const [username, setUsername] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -113,6 +99,14 @@ function WinModalComponent({ clicks, time, gridCells, matchedArticles, articleHi
         history,
         ...(gameId && { gameId }),
         ...(gameType && { gameType }),
+      })
+
+      // Log game_finished event (non-blocking)
+      void logEvent('game_finished', {
+        score,
+        time,
+        clicks,
+        ...(hashedId && { hashedId }),
       })
 
       setSubmitted(true)

@@ -8,7 +8,8 @@ import { detectWinningCells } from './winDetection'
 import type { GameGridCell, GameState } from './types'
 import { GRID_CELL_COUNT, STARTING_POOL_SIZE } from '../../shared/constants'
 import { useGameTimer } from './useGameTimer'
-import { fetchGame, createGame } from '../../shared/api/gamesClient'
+import { fetchGame, createGame, isValidHashedId } from '../../shared/api/gamesClient'
+import { logEvent } from '../../shared/api/loggingClient'
 
 /**
  * Creates the initial game state with all values reset to defaults.
@@ -176,8 +177,8 @@ export interface UseGameStateOptions {
 export function useGameState(options: UseGameStateOptions = {}): [
   GameState,
   {
-    startNewGame: (gameState?: { gridCells: GameGridCell[]; startingArticle: CuratedArticle; gameId?: string; gameType?: 'fresh' | 'linked' }) => Promise<void>
-    loadGameFromId: (gameId: string) => Promise<void>
+    startNewGame: (gameState?: { gridCells: GameGridCell[]; startingArticle: CuratedArticle; gameId?: string; hashedId?: string; gameType?: 'random' | 'repeat' }) => Promise<void>
+    loadGameFromId: (identifier: string) => Promise<void>
     createShareableGame: () => Promise<{ gameId: string; url: string }>
     registerNavigation: (title: string) => Promise<void>
     setArticleLoading: (loading: boolean) => void
@@ -209,7 +210,7 @@ export function useGameState(options: UseGameStateOptions = {}): [
   }, [])
 
   const startNewGame = useMemo(
-    () => async (providedGameState?: { gridCells: GameGridCell[]; startingArticle: CuratedArticle; gameId?: string; gameType?: 'fresh' | 'linked' }) => {
+    () => async (providedGameState?: { gridCells: GameGridCell[]; startingArticle: CuratedArticle; gameId?: string; hashedId?: string; gameType?: 'random' | 'repeat' }) => {
       if (providedGameState) {
         // Load game from provided state
         const startingTitle = getCuratedArticleTitle(providedGameState.startingArticle)
@@ -221,8 +222,9 @@ export function useGameState(options: UseGameStateOptions = {}): [
           currentArticleTitle: startingTitle,
           articleHistory: [startingTitle],
           timerRunning: false,
-          gameId: providedGameState.gameId,
-          gameType: providedGameState.gameType || 'linked',
+          hashedId: providedGameState.hashedId,
+          gameId: providedGameState.gameId, // Keep for backward compatibility
+          gameType: providedGameState.gameType || 'repeat',
         })
       } else {
         // Generate new game
@@ -239,7 +241,7 @@ export function useGameState(options: UseGameStateOptions = {}): [
           currentArticleTitle: startingTitle,
           articleHistory: [startingTitle],
           timerRunning: false,
-          gameType: 'fresh',
+          gameType: 'random',
         })
       }
     },
@@ -247,12 +249,12 @@ export function useGameState(options: UseGameStateOptions = {}): [
   )
 
   /**
-   * Loads a game state from the API by gameId.
-   * @param gameId - UUID v4 game identifier
+   * Loads a game state from the API by hashedId (preferred) or gameId (backward compatibility).
+   * @param identifier - Hashed ID (16 chars) or UUID v4 game identifier
    */
-  const loadGameFromId = useCallback(async (gameId: string) => {
+  const loadGameFromId = useCallback(async (identifier: string) => {
     try {
-      const gameState = await fetchGame(gameId)
+      const gameState = await fetchGame(identifier)
       
       // Convert string titles to CuratedArticle objects
       const gridCells: GameGridCell[] = gameState.gridCells.map((title, index) => ({
@@ -271,8 +273,9 @@ export function useGameState(options: UseGameStateOptions = {}): [
         currentArticleTitle: startingTitle,
         articleHistory: [startingTitle],
         timerRunning: false,
-        gameId: gameState.gameId,
-        gameType: 'linked',
+        hashedId: gameState.hashedId,
+        gameId: gameState.gameId, // Keep for backward compatibility
+        gameType: 'repeat',
       })
     } catch (error) {
       console.error('Failed to load game:', error)
@@ -282,7 +285,7 @@ export function useGameState(options: UseGameStateOptions = {}): [
 
   /**
    * Creates a shareable game by generating a new game and storing it in the API.
-   * @returns Object with gameId and shareable URL
+   * @returns Object with hashedId and shareable URL (path-based format)
    */
   const createShareableGame = useCallback(async (): Promise<{ gameId: string; url: string }> => {
     try {
@@ -299,14 +302,17 @@ export function useGameState(options: UseGameStateOptions = {}): [
       const createdGame = await createGame({
         gridCells: gridCellTitles,
         startingArticle: startingTitle,
-        gameType: 'fresh',
+        gameType: 'random',
       })
 
-      // Generate shareable URL
-      const url = `${window.location.origin}${window.location.pathname}?game=${createdGame.gameId}`
+      // Generate shareable URL using path-based format: /{hashedId}
+      const url = `${window.location.origin}/${createdGame.hashedId}`
+
+      // Log game_generated event (non-blocking)
+      void logEvent('game_generated', { hashedId: createdGame.hashedId })
 
       return {
-        gameId: createdGame.gameId,
+        gameId: createdGame.hashedId, // Return hashedId as gameId for backward compatibility
         url,
       }
     } catch (error) {

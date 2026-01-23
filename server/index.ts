@@ -23,7 +23,8 @@ app.get('/api/leaderboard', async (req, res) => {
     const limit = Math.max(parseInt((req.query.limit as string) ?? '10', 10) || 10, 1);
     const page = Math.max(parseInt((req.query.page as string) ?? '1', 10) || 1, 1);
     const sortBy = (req.query.sortBy as string) || 'score';
-    const sortOrder = (req.query.sortOrder as string) === 'asc' ? 'asc' : 'desc';
+    // Default to ascending sort order (lower scores rank higher)
+    const sortOrder = (req.query.sortOrder as string) === 'desc' ? 'desc' : 'asc';
 
     const validSortFields = ['score', 'clicks', 'time', 'createdAt', 'username'] as const;
     const sortField = validSortFields.includes(sortBy as any) ? sortBy : 'score';

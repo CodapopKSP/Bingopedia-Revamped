@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes } from 'crypto';
 import { getGamesCollection, type GameState } from './mongoClient';
 import { createErrorResponse, handleApiError } from './errors';
 
@@ -17,6 +17,19 @@ function applyCors(res: VercelResponse) {
 }
 
 /**
+ * Generates a 16-character URL-safe hashed ID for shareable games.
+ * Uses 12 random bytes converted to base64url encoding, truncated to 16 characters.
+ *
+ * @returns 16-character URL-safe hash
+ */
+function generateHashedId(): string {
+  // Generate 12 random bytes (96 bits)
+  const bytes = randomBytes(12);
+  // Convert to base64url (URL-safe, no padding)
+  return bytes.toString('base64url').substring(0, 16);
+}
+
+/**
  * Validates UUID v4 format.
  *
  * @param uuid - UUID string to validate
@@ -25,6 +38,18 @@ function applyCors(res: VercelResponse) {
 function isValidUUID(uuid: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(uuid);
+}
+
+/**
+ * Validates hashed ID format (16 characters, URL-safe).
+ *
+ * @param hashedId - Hashed ID string to validate
+ * @returns true if valid hashed ID format, false otherwise
+ */
+function isValidHashedId(hashedId: string): boolean {
+  // 16 characters, URL-safe base64url characters (A-Z, a-z, 0-9, -, _)
+  const hashedIdRegex = /^[A-Za-z0-9_-]{16}$/;
+  return hashedIdRegex.test(hashedId);
 }
 
 /**
@@ -80,34 +105,66 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Validate gameType
-      if (gameType !== 'fresh' && gameType !== 'linked') {
+      if (gameType !== 'random' && gameType !== 'repeat') {
         res.status(400).json(
           createErrorResponse(
             'VALIDATION_ERROR',
-            "gameType must be either 'fresh' or 'linked'",
+            "gameType must be either 'random' or 'repeat'",
             { field: 'gameType', value: gameType }
           )
         );
         return;
       }
 
-      // Generate UUID v4 for gameId
-      const gameId = randomUUID();
+      // Generate hashed ID with collision handling (max 3 attempts)
+      let hashedId: string;
+      let attempts = 0;
+      const maxAttempts = 3;
+      
+      while (attempts < maxAttempts) {
+        hashedId = generateHashedId();
+        try {
+          // Try to insert with the generated hashedId
+          const gameId = randomUUID(); // Keep UUID for backward compatibility
+          
+          const gameState: GameState = {
+            hashedId,
+            gameId, // Optional, for backward compatibility
+            gridCells: gridCells.map(String),
+            startingArticle: String(startingArticle).trim(),
+            gameType: gameType || 'random',
+            createdAt: new Date(),
+            ...(createdBy && { createdBy: String(createdBy).trim() }),
+          };
 
-      const gameState: GameState = {
-        gameId,
-        gridCells: gridCells.map(String),
-        startingArticle: String(startingArticle).trim(),
-        gameType: gameType || 'fresh',
-        createdAt: new Date(),
-        ...(createdBy && { createdBy: String(createdBy).trim() }),
-      };
+          const result = await collection.insertOne(gameState);
+          const insertedGame = { ...gameState, _id: result.insertedId };
 
-      const result = await collection.insertOne(gameState);
-      const insertedGame = { ...gameState, _id: result.insertedId };
-
-      res.status(201).json(insertedGame);
-      return;
+          res.status(201).json(insertedGame);
+          return;
+        } catch (error) {
+          const err = error as Error;
+          // Check if error is due to unique constraint violation on hashedId
+          if (err.message.includes('duplicate key') || err.message.includes('E11000')) {
+            attempts++;
+            if (attempts >= maxAttempts) {
+              console.error('Failed to generate unique hashedId after', maxAttempts, 'attempts');
+              res.status(500).json(
+                createErrorResponse(
+                  'SERVER_ERROR',
+                  'Failed to generate unique game ID. Please try again.',
+                  { attempts: maxAttempts }
+                )
+              );
+              return;
+            }
+            // Retry with new hashedId
+            continue;
+          }
+          // Re-throw if it's not a duplicate key error
+          throw error;
+        }
+      }
     }
 
     res.setHeader('Allow', 'POST,OPTIONS');

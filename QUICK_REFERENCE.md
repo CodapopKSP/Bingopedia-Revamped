@@ -1,6 +1,6 @@
 # Bingopedia Quick Reference
 
-Essential information for working on this project. For detailed specs, see archived docs in `docs/archive/`.
+Essential information for working on this project. For detailed specs, see `PRODUCT_PRD.md` and `docs/PROJECT_OVERVIEW.md`.
 
 ---
 

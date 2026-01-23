@@ -93,6 +93,12 @@
   --color-blue-accent-rgba: rgba(59, 130, 246, 0.35);
   --color-green-accent: #22c55e;
   --color-red-accent: #ef4444;
+  
+  /* Article Viewer Colors (Dark Mode) */
+  --article-bg: #1a1a1a;
+  --site-bg: #0d0d0d;
+  --article-text: #ffffff;
+  --article-border: #333333;
 }
 
 [data-theme="light"] {
@@ -180,5 +186,11 @@
   --color-blue-accent-rgba: rgba(59, 130, 246, 0.35);
   --color-green-accent: #10b981;
   --color-red-accent: #ef4444;
+  
+  /* Article Viewer Colors (Light Mode) */
+  --article-bg: #ffffff;
+  --site-bg: #f5f5f5;
+  --article-text: #000000;
+  --article-border: #e0e0e0;
 }
 

@@ -2,10 +2,13 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: radial-gradient(circle at top, var(--bg-gradient-start), var(--bg-gradient-end) 60%);
+  background: var(--site-bg);
   color: var(--text-primary);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overflow: hidden;
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
 }
 
 .bp-app-header {
@@ -17,6 +20,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  .bp-app-header {
+    padding: 0.75rem 1rem;
+  }
 }
 
 .bp-app-title {
@@ -34,7 +45,17 @@
   padding: 1rem;
   min-height: 0;
   overflow: hidden;
+  overflow-x: hidden;
   max-height: 100%;
+  max-width: 100vw;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  .bp-app-main {
+    padding: 0.75rem;
+  }
 }
 
 @media (min-width: 768px) {

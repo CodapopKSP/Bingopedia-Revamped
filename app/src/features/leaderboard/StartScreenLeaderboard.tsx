@@ -3,6 +3,7 @@ import { fetchLeaderboard, type FetchLeaderboardParams } from '../../shared/api/
 import type { LeaderboardEntry, GameGridCell } from '../game/types'
 import type { CuratedArticle } from '../../shared/data/types'
 import { GameDetailsModal } from './GameDetailsModal'
+import { formatTime } from '../../shared/utils/timeFormat'
 import './StartScreenLeaderboard.css'
 
 /**
@@ -28,12 +29,14 @@ function formatDate(date: string | Date): string {
 }
 
 type TimeFilter = 'all' | 'today' | '7days' | '30days' | 'year'
-type GameTypeFilter = 'fresh' | 'linked' | 'all'
+type GameTypeFilter = 'random' | 'repeat' | 'all'
 
 /**
  * Calculates date range for a time filter option.
+ * Uses UTC timezone to match backend expectations.
+ * 
  * @param filter - Time filter option
- * @returns Object with dateFrom and dateTo ISO strings, or undefined for 'all'
+ * @returns Object with dateFrom and dateTo ISO strings, or empty object for 'all'
  */
 function getDateRange(filter: TimeFilter): { dateFrom?: string; dateTo?: string } {
   if (filter === 'all') {
@@ -41,23 +44,77 @@ function getDateRange(filter: TimeFilter): { dateFrom?: string; dateTo?: string 
   }
 
   const now = new Date()
-  const dateTo = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+  // Use UTC dates to match backend timezone handling
+  const utcNow = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    now.getUTCHours(),
+    now.getUTCMinutes(),
+    now.getUTCSeconds()
+  ))
+  
+  // dateTo: End of today in UTC (23:59:59.999)
+  const dateTo = new Date(Date.UTC(
+    utcNow.getUTCFullYear(),
+    utcNow.getUTCMonth(),
+    utcNow.getUTCDate(),
+    23,
+    59,
+    59,
+    999
+  ))
+  
   let dateFrom: Date
 
   switch (filter) {
     case 'today':
-      dateFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+      // Start of today in UTC (00:00:00.000)
+      dateFrom = new Date(Date.UTC(
+        utcNow.getUTCFullYear(),
+        utcNow.getUTCMonth(),
+        utcNow.getUTCDate(),
+        0,
+        0,
+        0,
+        0
+      ))
       break
     case '7days':
-      dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-      dateFrom.setHours(0, 0, 0, 0)
+      // 7 days ago, start of day in UTC
+      dateFrom = new Date(Date.UTC(
+        utcNow.getUTCFullYear(),
+        utcNow.getUTCMonth(),
+        utcNow.getUTCDate() - 7,
+        0,
+        0,
+        0,
+        0
+      ))
       break
     case '30days':
-      dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-      dateFrom.setHours(0, 0, 0, 0)
+      // 30 days ago, start of day in UTC
+      dateFrom = new Date(Date.UTC(
+        utcNow.getUTCFullYear(),
+        utcNow.getUTCMonth(),
+        utcNow.getUTCDate() - 30,
+        0,
+        0,
+        0,
+        0
+      ))
       break
     case 'year':
-      dateFrom = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0)
+      // Start of current year in UTC (January 1, 00:00:00.000)
+      dateFrom = new Date(Date.UTC(
+        utcNow.getUTCFullYear(),
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ))
       break
     default:
       return {}
@@ -70,7 +127,7 @@ function getDateRange(filter: TimeFilter): { dateFrom?: string; dateTo?: string 
 }
 
 interface StartScreenLeaderboardProps {
-  onReplay?: (gameState: { gridCells: GameGridCell[]; startingArticle: CuratedArticle; gameId?: string; gameType?: 'fresh' | 'linked' }) => Promise<void>
+  onReplay?: (gameState: { gridCells: GameGridCell[]; startingArticle: CuratedArticle; gameId?: string; hashedId?: string; gameType?: 'random' | 'repeat' }) => Promise<void>
 }
 
 export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps = {}) {
@@ -79,9 +136,18 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
   const [error, setError] = useState<string | null>(null)
   const [selectedEntry, setSelectedEntry] = useState<LeaderboardEntry | null>(null)
   const [sortBy, setSortBy] = useState<FetchLeaderboardParams['sortBy']>('score')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  // Default sort order is ascending (lower scores are better)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all')
-  const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilter>('fresh')
+  const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilter>('random')
+  const [page, setPage] = useState(1)
+  const [limit] = useState(20) // Increased from 5 to 20
+  const [totalPages, setTotalPages] = useState(1)
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1)
+  }, [sortBy, sortOrder, timeFilter, gameTypeFilter])
 
   useEffect(() => {
     let cancelled = false
@@ -90,7 +156,8 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
         setLoading(true)
         const dateRange = getDateRange(timeFilter)
         const res = await fetchLeaderboard({
-          limit: 5,
+          limit,
+          page,
           sortBy,
           sortOrder,
           ...dateRange,
@@ -98,6 +165,7 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
         })
         if (!cancelled) {
           setEntries(res.users)
+          setTotalPages(res.pagination.totalPages)
         }
       } catch (e) {
         if (!cancelled) {
@@ -113,14 +181,15 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
     return () => {
       cancelled = true
     }
-  }, [sortBy, sortOrder, timeFilter, gameTypeFilter])
+  }, [limit, page, sortBy, sortOrder, timeFilter, gameTypeFilter])
 
   const handleRetry = () => {
     setError(null)
     setLoading(true)
     const dateRange = getDateRange(timeFilter)
     fetchLeaderboard({
-      limit: 5,
+      limit,
+      page,
       sortBy,
       sortOrder,
       ...dateRange,
@@ -128,6 +197,7 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
     })
       .then((res) => {
         setEntries(res.users)
+        setTotalPages(res.pagination.totalPages)
         setLoading(false)
       })
       .catch(() => {
@@ -137,30 +207,17 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
   }
 
   const handleSort = (field: FetchLeaderboardParams['sortBy']) => {
-    if (sortBy === field) {
-      // Toggle sort order if clicking the same field
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      // Set new sort field
-      // Default sort orders:
-      // - createdAt: desc (newer first)
-      // - username: asc (alphabetical)
-      // - score, time, clicks: asc (lower is better)
+    // Only allow sorting on score, time, and clicks
+    // Always sort ascending (low to high)
+    if (field === 'score' || field === 'time' || field === 'clicks') {
       setSortBy(field)
-      if (field === 'createdAt') {
-        setSortOrder('desc')
-      } else if (field === 'username') {
-        setSortOrder('asc')
-      } else {
-        // score, time, clicks: ascending (lower is better)
-        setSortOrder('asc')
-      }
+      setSortOrder('asc')
     }
   }
 
   const getSortIndicator = (field: FetchLeaderboardParams['sortBy']) => {
-    if (sortBy !== field) return null
-    return sortOrder === 'asc' ? ' ↑' : ' ↓'
+    // No arrows, just use highlighting
+    return null
   }
 
   return (
@@ -168,12 +225,9 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
       <div className="bp-leaderboard-header">
         <h3>Top Scores</h3>
         <div className="bp-leaderboard-filters">
-          <label htmlFor="time-filter" className="bp-leaderboard-filter-label">
-            Time Period:
-          </label>
           <select
             id="time-filter"
-            className="bp-leaderboard-filter-select"
+            className="bp-leaderboard-filter-select bp-leaderboard-filter-select-time"
             value={timeFilter}
             onChange={(e) => {
               setTimeFilter(e.target.value as TimeFilter)
@@ -186,18 +240,15 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
             <option value="30days">Past 30 Days</option>
             <option value="year">Past Year</option>
           </select>
-          <label htmlFor="game-type-filter" className="bp-leaderboard-filter-label">
-            Game Type:
-          </label>
           <select
             id="game-type-filter"
-            className="bp-leaderboard-filter-select"
+            className="bp-leaderboard-filter-select bp-leaderboard-filter-select-game-type"
             value={gameTypeFilter}
             onChange={(e) => setGameTypeFilter(e.target.value as GameTypeFilter)}
             aria-label="Filter by game type"
           >
-            <option value="fresh">Fresh Games</option>
-            <option value="linked">Linked Games</option>
+            <option value="random">Random Games</option>
+            <option value="repeat">Repeat Games</option>
             <option value="all">All Games</option>
           </select>
         </div>
@@ -218,86 +269,100 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
       )}
       {!loading && !error && entries.length === 0 && <p className="bp-muted">No scores yet. Be the first!</p>}
       {!loading && !error && entries.length > 0 && (
-        <table className="bp-leaderboard-table">
-          <thead>
-            <tr>
-              <th>
-                <button
-                  type="button"
-                  className="bp-leaderboard-sort-button"
-                  onClick={() => handleSort('username')}
-                  aria-label="Sort by username"
-                >
-                  Player{getSortIndicator('username')}
-                </button>
-              </th>
-              <th>
-                <button
-                  type="button"
-                  className="bp-leaderboard-sort-button"
-                  onClick={() => handleSort('score')}
-                  aria-label="Sort by score"
-                >
-                  Score{getSortIndicator('score')}
-                </button>
-              </th>
-              <th>
-                <button
-                  type="button"
-                  className="bp-leaderboard-sort-button"
-                  onClick={() => handleSort('time')}
-                  aria-label="Sort by time"
-                >
-                  Time{getSortIndicator('time')}
-                </button>
-              </th>
-              <th>
-                <button
-                  type="button"
-                  className="bp-leaderboard-sort-button"
-                  onClick={() => handleSort('clicks')}
-                  aria-label="Sort by clicks"
-                >
-                  Clicks{getSortIndicator('clicks')}
-                </button>
-              </th>
-              <th>
-                <button
-                  type="button"
-                  className="bp-leaderboard-sort-button"
-                  onClick={() => handleSort('createdAt')}
-                  aria-label="Sort by date"
-                >
-                  Date{getSortIndicator('createdAt')}
-                </button>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry) => (
-              <tr
-                key={entry._id || entry.username}
-                className="bp-leaderboard-row"
-                onClick={() => setSelectedEntry(entry)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    setSelectedEntry(entry)
-                  }
-                }}
-                aria-label={`View details for ${entry.username}'s game`}
-              >
-                <td>{entry.username}</td>
-                <td>{entry.score.toLocaleString()}</td>
-                <td>{entry.time}s</td>
-                <td>{entry.clicks}</td>
-                <td>{entry.createdAt ? formatDate(entry.createdAt) : 'N/A'}</td>
+        <>
+          <table className="bp-leaderboard-table">
+            <thead>
+              <tr>
+                <th className="bp-leaderboard-number-header">#</th>
+                <th>Player</th>
+                <th>
+                  <button
+                    type="button"
+                    className={`bp-leaderboard-sort-button ${sortBy === 'score' ? 'bp-leaderboard-sort-button--active' : ''}`}
+                    onClick={() => handleSort('score')}
+                    aria-label="Sort by score"
+                  >
+                    Score
+                  </button>
+                </th>
+                <th>
+                  <button
+                    type="button"
+                    className={`bp-leaderboard-sort-button ${sortBy === 'time' ? 'bp-leaderboard-sort-button--active' : ''}`}
+                    onClick={() => handleSort('time')}
+                    aria-label="Sort by time"
+                  >
+                    Time
+                  </button>
+                </th>
+                <th>
+                  <button
+                    type="button"
+                    className={`bp-leaderboard-sort-button ${sortBy === 'clicks' ? 'bp-leaderboard-sort-button--active' : ''}`}
+                    onClick={() => handleSort('clicks')}
+                    aria-label="Sort by clicks"
+                  >
+                    Clicks
+                  </button>
+                </th>
+                <th>Date</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {entries.map((entry, index) => {
+                const rowNumber = (page - 1) * limit + index + 1
+                return (
+                  <tr
+                    key={entry._id || entry.username}
+                    className="bp-leaderboard-row"
+                    onClick={() => setSelectedEntry(entry)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        setSelectedEntry(entry)
+                      }
+                    }}
+                    aria-label={`View details for ${entry.username}'s game`}
+                  >
+                    <td className="bp-leaderboard-number-cell">{rowNumber}</td>
+                    <td>{entry.username}</td>
+                    <td>{entry.score.toLocaleString()}</td>
+                    <td>{formatTime(entry.time)}</td>
+                    <td>{entry.clicks}</td>
+                    <td>{entry.createdAt ? formatDate(entry.createdAt) : 'N/A'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          {totalPages > 1 && (
+            <div className="bp-pagination">
+              <button
+                type="button"
+                className="bp-pagination-button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                aria-label="Previous page"
+              >
+                Previous
+              </button>
+              <span className="bp-pagination-info">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                className="bp-pagination-button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                aria-label="Next page"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
       {selectedEntry && (
         <GameDetailsModal

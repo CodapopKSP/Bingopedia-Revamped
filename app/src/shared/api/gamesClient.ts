@@ -1,10 +1,11 @@
-import { getApiBaseUrl } from './config'
+// Removed getApiBaseUrl import - using direct paths instead
 
 export interface GameStateResponse {
-  gameId: string
+  hashedId: string // 16-character hashed ID (primary identifier)
+  gameId?: string // UUID v4 (optional, for backward compatibility)
   gridCells: string[]
   startingArticle: string
-  gameType: 'fresh' | 'linked'
+  gameType: 'random' | 'repeat'
   createdAt: string | Date
   createdBy?: string
 }
@@ -12,20 +13,29 @@ export interface GameStateResponse {
 export interface CreateGamePayload {
   gridCells: string[]
   startingArticle: string
-  gameType: 'fresh' | 'linked'
+  gameType: 'random' | 'repeat'
   createdBy?: string
 }
 
 /**
- * Fetches a game state by gameId from the API.
- * @param gameId - UUID v4 game identifier
+ * Validates if a string is a valid hashed ID (16 characters, URL-safe).
+ * @param id - String to validate
+ * @returns True if valid hashed ID format
+ */
+export function isValidHashedId(id: string): boolean {
+  // Hashed ID is 16 characters, URL-safe (A-Za-z0-9_-)
+  return /^[A-Za-z0-9_-]{16}$/.test(id)
+}
+
+/**
+ * Fetches a game state by hashedId (preferred) or gameId (backward compatibility) from the API.
+ * @param identifier - Hashed ID (16 chars) or UUID v4 game identifier
  * @returns Game state response
  * @throws Error if game not found or request fails
  */
-export async function fetchGame(gameId: string): Promise<GameStateResponse> {
-  // Construct URL for games API (similar structure to leaderboard API)
-  const apiBase = getApiBaseUrl().replace('/leaderboard', '')
-  const url = new URL(`${apiBase}/games/${gameId}`, window.location.origin)
+export async function fetchGame(identifier: string): Promise<GameStateResponse> {
+  // Use absolute path - don't manipulate base URL
+  const url = new URL(`/api/games/${identifier}`, window.location.origin)
 
   try {
     const response = await fetch(url.toString())
@@ -36,7 +46,7 @@ export async function fetchGame(gameId: string): Promise<GameStateResponse> {
       try {
         const errorData = await response.json()
         if (errorData.error || errorData.message) {
-          errorMessage = errorData.error || errorData.message
+          errorMessage = errorData.error?.message || errorData.message || errorMessage
         }
       } catch {
         if (response.status === 404) {
@@ -65,13 +75,12 @@ export async function fetchGame(gameId: string): Promise<GameStateResponse> {
 /**
  * Creates a new shareable game state.
  * @param payload - Game state data
- * @returns Created game state with gameId
+ * @returns Created game state with hashedId (and optional gameId for backward compatibility)
  * @throws Error if creation fails
  */
 export async function createGame(payload: CreateGamePayload): Promise<GameStateResponse> {
-  // Construct URL for games API (similar structure to leaderboard API)
-  const apiBase = getApiBaseUrl().replace('/leaderboard', '')
-  const url = new URL(`${apiBase}/games`, window.location.origin)
+  // Use absolute path - don't manipulate base URL
+  const url = new URL('/api/games', window.location.origin)
 
   try {
     const response = await fetch(url.toString(), {
@@ -88,7 +97,7 @@ export async function createGame(payload: CreateGamePayload): Promise<GameStateR
       try {
         const errorData = await response.json()
         if (errorData.error || errorData.message) {
-          errorMessage = errorData.error || errorData.message
+          errorMessage = errorData.error?.message || errorData.message || errorMessage
         }
       } catch {
         if (response.status === 400) {

@@ -11,8 +11,16 @@
       "destination": "/api/games"
     },
     {
+      "source": "/api/logging",
+      "destination": "/api/logging"
+    },
+    {
+      "source": "/api/games/:hashedId",
+      "destination": "/api/games/[hashedId]"
+    },
+    {
       "source": "/api/games/:gameId",
-      "destination": "/api/games/[gameId]"
+      "destination": "/api/games/[hashedId]"
     },
     {
       "source": "/(.*)",

@@ -4,22 +4,13 @@ import { BingoGrid } from '../game/BingoGrid'
 import { HistoryPanel } from '../game/HistoryPanel'
 import { ArticleSummaryModal } from '../game/ArticleSummaryModal'
 import type { CuratedArticle } from '../../shared/data/types'
+import { formatTime } from '../../shared/utils/timeFormat'
 import './GameDetailsModal.css'
 
 interface GameDetailsModalProps {
   entry: LeaderboardEntry
   onClose: () => void
-  onReplay?: (gameState: { gridCells: GameGridCell[]; startingArticle: CuratedArticle; gameId?: string; gameType?: 'fresh' | 'linked' }) => Promise<void>
-}
-
-function formatTime(seconds: number): string {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = seconds % 60
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
-  }
-  return `${minutes}:${String(secs).padStart(2, '0')}`
+  onReplay?: (gameState: { gridCells: GameGridCell[]; startingArticle: CuratedArticle; gameId?: string; hashedId?: string; gameType?: 'random' | 'repeat' }) => Promise<void>
 }
 
 /**
@@ -108,7 +99,7 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
           gridCells: [], // Will be loaded from API
           startingArticle: { title: '' }, // Will be loaded from API
           gameId: entry.gameId,
-          gameType: 'linked',
+          gameType: 'repeat',
         })
       } else if (entry.bingoSquares && entry.history && entry.history.length > 0) {
         // Reconstruct from bingoSquares and history
@@ -118,7 +109,7 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
         await onReplay({
           gridCells,
           startingArticle,
-          gameType: 'linked',
+          gameType: 'repeat',
         })
       } else {
         console.error('Cannot replay: missing gameId, bingoSquares, or history')

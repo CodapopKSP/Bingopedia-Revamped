@@ -4,10 +4,14 @@
   border: 1px solid var(--border-primary);
   margin-top: 1rem;
   overflow: hidden;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .bp-history-header {
