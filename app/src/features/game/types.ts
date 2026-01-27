@@ -36,6 +36,7 @@ export interface LeaderboardEntry {
   time: number
   clicks: number
   bingoSquares?: string[]
+  bingopediaGame?: string[]
   history?: string[]
   createdAt: string | Date
   gameId?: string // UUID v4 for replay functionality

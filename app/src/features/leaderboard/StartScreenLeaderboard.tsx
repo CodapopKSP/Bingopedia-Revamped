@@ -155,6 +155,7 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
       try {
         setLoading(true)
         const dateRange = getDateRange(timeFilter)
+        console.log('[Frontend] Time filter:', timeFilter, 'Date range:', dateRange)
         const res = await fetchLeaderboard({
           limit,
           page,

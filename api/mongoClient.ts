@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection } from 'mongodb';
+import { MongoClient, Db, Collection, ObjectId } from 'mongodb';
 import { getMongoConfig } from './config';
 
 let cachedClient: MongoClient | null = null;
@@ -10,6 +10,7 @@ export interface LeaderboardEntry {
   time: number;
   clicks: number;
   bingoSquares: string[];
+  bingopediaGame?: string[];
   history: string[];
   createdAt: Date;
   gameId?: string; // Optional for backward compatibility
@@ -21,27 +22,18 @@ export interface LeaderboardEntry {
   gameType?: 'random' | 'repeat';
 }
 
-export interface GameState {
-  _id?: unknown; // MongoDB ObjectId
+export interface GeneratedGame {
+  _id?: ObjectId; // MongoDB ObjectId
   /**
-   * 16-character URL-safe hashed ID for shareable games.
-   * Required for new games, unique across all games.
+   * 16-character URL-safe hash used in shareable links.
    */
-  hashedId: string;
+  link: string;
   /**
-   * UUID v4 game ID. Kept for backward compatibility.
-   * Optional for new games (hashedId is preferred).
+   * 26 article titles: 25 grid squares + starting article.
    */
-  gameId?: string;
-  gridCells: string[]; // 25 article titles
-  startingArticle: string;
-  /**
-   * Game type: 'random' for random games, 'repeat' for repeat/linked games.
-   * Terminology updated from 'fresh'/'linked' to 'random'/'repeat'.
-   */
-  gameType: 'random' | 'repeat';
+  bingopediaGame: string[];
   createdAt: Date;
-  createdBy?: string; // Optional username
+  timesPlayed: number;
 }
 
 /**
@@ -121,11 +113,11 @@ export async function getLeaderboardCollection(): Promise<Collection<Leaderboard
  * const game = await collection.findOne({ gameId: 'some-uuid' });
  * ```
  */
-export async function getGamesCollection(): Promise<Collection<GameState>> {
+export async function getGamesCollection(): Promise<Collection<GeneratedGame>> {
   if (cachedClient && cachedDb) {
     try {
       await cachedDb.command({ ping: 1 });
-      return cachedDb.collection<GameState>('games');
+      return cachedDb.collection<GeneratedGame>('generated-games');
     } catch {
       cachedClient = null;
       cachedDb = null;
@@ -142,9 +134,8 @@ export async function getGamesCollection(): Promise<Collection<GameState>> {
   const db = client.db(dbName);
 
   try {
-    await db.collection('games').createIndex({ hashedId: 1 }, { unique: true });
-    await db.collection('games').createIndex({ gameId: 1 }, { unique: true, sparse: true });
-    await db.collection('games').createIndex({ createdAt: -1 });
+    await db.collection('generated-games').createIndex({ link: 1 }, { unique: true });
+    await db.collection('generated-games').createIndex({ createdAt: -1 });
   } catch (error) {
     console.log('Index creation note:', (error as Error).message);
   }
@@ -152,7 +143,7 @@ export async function getGamesCollection(): Promise<Collection<GameState>> {
   cachedClient = client;
   cachedDb = db;
 
-  return db.collection<GameState>('games');
+  return db.collection<GeneratedGame>('generated-games');
 }
 
 /**

@@ -2,6 +2,8 @@ import { useState, useEffect, memo } from 'react'
 import { submitScore } from '../../shared/api/leaderboardClient'
 import type { GameGridCell } from './types'
 import { getCuratedArticleTitle } from '../../shared/data/types'
+import { normalizeTitle } from '../../shared/wiki/normalizeTitle'
+import { resolveRedirect } from '../../shared/wiki/resolveRedirect'
 import { validateUsername } from '../../shared/utils/validation'
 import { formatTime } from '../../shared/utils/timeFormat'
 import { logEvent } from '../../shared/api/loggingClient'
@@ -20,22 +22,58 @@ interface WinModalProps {
 
 /**
  * Formats bingo grid cells for leaderboard submission.
- * Adds "[Found]" prefix to matched articles.
+ * Returns raw titles (no "[Found]" markers).
  * 
  * @param gridCells - Array of grid cells
- * @param matchedArticles - Set of matched article titles
- * @returns Array of formatted square strings
+ * @returns Array of square strings
  */
-function formatBingoSquares(gridCells: GameGridCell[], matchedArticles: Set<string>): string[] {
-  const matchedSet = matchedArticles
-  return gridCells.map((cell) => {
-    const title = getCuratedArticleTitle(cell.article)
-    const normalized = title.toLowerCase().replace(/_/g, ' ')
-    const isFound = Array.from(matchedSet).some(
-      (matched) => matched.toLowerCase().replace(/_/g, ' ') === normalized
-    )
-    return isFound ? `[Found] ${title}` : title
-  })
+function formatBingoSquares(gridCells: GameGridCell[]): string[] {
+  return gridCells.map((cell) => getCuratedArticleTitle(cell.article))
+}
+
+async function addFoundTagsToHistory(history: string[], bingoSquares: string[]): Promise<string[]> {
+  const normalizedBoardTitles = new Set(bingoSquares.map((title) => normalizeTitle(title)))
+  const normalizedBoardRedirects = new Set<string>()
+
+  for (const title of bingoSquares) {
+    const resolved = await resolveRedirect(title)
+    normalizedBoardRedirects.add(normalizeTitle(resolved))
+  }
+
+  const seen = new Set<string>()
+
+  const taggedHistory = []
+  for (const title of history) {
+    if (!title) {
+      taggedHistory.push(title)
+      continue
+    }
+
+    const normalized = normalizeTitle(title)
+    const resolved = await resolveRedirect(title)
+    const normalizedResolved = normalizeTitle(resolved)
+    const isBoardMatch =
+      normalizedBoardTitles.has(normalized) ||
+      normalizedBoardTitles.has(normalizedResolved) ||
+      normalizedBoardRedirects.has(normalized) ||
+      normalizedBoardRedirects.has(normalizedResolved)
+
+    if (!isBoardMatch) {
+      taggedHistory.push(title)
+      continue
+    }
+
+    const dedupeKey = normalizedResolved || normalized
+    if (seen.has(dedupeKey)) {
+      taggedHistory.push(title)
+      continue
+    }
+
+    seen.add(dedupeKey)
+    taggedHistory.push(`[Found] ${title}`)
+  }
+
+  return taggedHistory
 }
 
 
@@ -87,8 +125,11 @@ function WinModalComponent({ clicks, time, gridCells, matchedArticles, articleHi
     setError(null)
 
     try {
-      const bingoSquares = formatBingoSquares(gridCells, matchedArticles)
+      const bingoSquares = formatBingoSquares(gridCells)
       const history = articleHistory || []
+      const taggedHistory = await addFoundTagsToHistory(history, bingoSquares)
+      const startingTitle = history[0]
+      const bingopediaGame = startingTitle ? [...bingoSquares, startingTitle] : undefined
 
       await submitScore({
         username: username.trim(),
@@ -96,7 +137,8 @@ function WinModalComponent({ clicks, time, gridCells, matchedArticles, articleHi
         time,
         clicks,
         bingoSquares,
-        history,
+        ...(bingopediaGame && { bingopediaGame }),
+        history: taggedHistory,
         ...(gameId && { gameId }),
         ...(gameType && { gameType }),
       })

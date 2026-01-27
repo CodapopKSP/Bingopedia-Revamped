@@ -1,0 +1,99 @@
+/* Table of Contents Styles */
+
+.bp-toc {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  padding: 1rem;
+  background: var(--bg-input, #f5f5f5);
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-primary, #ddd);
+}
+
+.bp-toc-header {
+  margin-bottom: 0.5rem;
+}
+
+.bp-toc-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-accent, #333);
+}
+
+.bp-toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.bp-toc-item {
+  margin: 0.25rem 0;
+}
+
+.bp-toc-item--level-1 {
+  font-weight: 500;
+}
+
+.bp-toc-item--level-2 {
+  padding-left: 1rem;
+  font-size: 0.9rem;
+}
+
+.bp-toc-item--level-3 {
+  padding-left: 2rem;
+  font-size: 0.85rem;
+}
+
+.bp-toc-item--level-4 {
+  padding-left: 3rem;
+  font-size: 0.8rem;
+}
+
+.bp-toc-link {
+  color: var(--link-color, #007bff);
+  text-decoration: none;
+  display: block;
+  padding: 0.25rem 0;
+  transition: color 0.2s, background-color 0.2s;
+  border-radius: 0.25rem;
+}
+
+.bp-toc-link:hover {
+  color: var(--link-hover, #0056b3);
+  background-color: var(--bg-input, rgba(0, 123, 255, 0.1));
+}
+
+.bp-toc-link:focus {
+  outline: 2px solid var(--focus-ring, #007bff);
+  outline-offset: 2px;
+}
+
+.bp-toc-sublist {
+  list-style: none;
+  padding: 0;
+  margin: 0.25rem 0 0 0;
+}
+
+/* ToC is now always in a modal, so no need to hide it */
+
+/* Scrollbar styling for ToC */
+.bp-toc::-webkit-scrollbar {
+  width: 6px;
+}
+
+.bp-toc::-webkit-scrollbar-track {
+  background: var(--scrollbar-track, transparent);
+}
+
+.bp-toc::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb, rgba(0, 0, 0, 0.2));
+  border-radius: 3px;
+}
+
+.bp-toc::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover, rgba(0, 0, 0, 0.3));
+}
+

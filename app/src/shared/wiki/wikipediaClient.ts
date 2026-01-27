@@ -214,6 +214,93 @@ export async function fetchArticleSummary(title: string): Promise<string> {
 }
 
 /**
+ * Determines if a Wikipedia link is navigable within the game.
+ * 
+ * Navigational links are those that point to valid Wikipedia articles that
+ * the game should treat as clickable. Non-navigational links include:
+ * - External links (http://, https://, mailto:, etc.)
+ * - Citation/reference anchors (#cite, #ref)
+ * - File/media links
+ * - Special Wikipedia pages (Help:, Template:, etc.)
+ * 
+ * @param href - The href attribute value from a link element
+ * @returns true if the link is navigable, false otherwise
+ */
+export function isNavigableWikiLink(href: string | null): boolean {
+  if (!href) return false
+  
+  // External links are not navigable
+  if (href.includes('://') || href.startsWith('//')) {
+    return false
+  }
+  
+  // Citation/reference links are not navigable
+  if (href.startsWith('#cite') || href.startsWith('#ref') || 
+      href.includes('cite_note') || href.includes('cite-ref')) {
+    return false
+  }
+  
+  // File/media links are not navigable
+  if (href.includes('/wiki/File:') || href.includes('/wiki/Image:') || 
+      href.includes('/wiki/Media:')) {
+    return false
+  }
+  
+  // Special Wikipedia namespaces are not navigable
+  if (href.includes('/wiki/Help:') || href.includes('/wiki/Template:') ||
+      href.includes('/wiki/Category:') || href.includes('/wiki/Wikipedia:')) {
+    return false
+  }
+  
+  // Valid article links are navigable
+  return (
+    href.includes('/wiki/') ||
+    href.startsWith('./') ||
+    href.startsWith('../') ||
+    (href.startsWith('/') && !href.includes('://') && !href.startsWith('//'))
+  )
+}
+
+/**
+ * Builds a Wikipedia URL for a given article title.
+ * 
+ * This function centralizes Wikipedia URL construction to ensure consistent
+ * formatting across the application. It handles:
+ * - Title normalization (spaces to underscores, proper encoding)
+ * - URL encoding for special characters
+ * - Proper capitalization (first letter uppercase, rest preserved)
+ * 
+ * The function accepts a canonical article key (normalized form) and returns
+ * a properly formatted Wikipedia URL that Wikipedia can resolve.
+ * 
+ * @param title - The article title (canonical/normalized form)
+ * @returns A complete Wikipedia URL string
+ * 
+ * @example
+ * ```typescript
+ * buildWikipediaUrl('Sony Music') // Returns: 'https://en.wikipedia.org/wiki/Sony_Music'
+ * buildWikipediaUrl('new york') // Returns: 'https://en.wikipedia.org/wiki/New_York'
+ * ```
+ */
+export function buildWikipediaUrl(title: string): string {
+  if (!title) return 'https://en.wikipedia.org/wiki/'
+  
+  // Wikipedia URL format: spaces become underscores, first letter is uppercase
+  // Replace spaces with underscores
+  let formatted = title.replace(/\s+/g, '_')
+  
+  // Capitalize first letter (Wikipedia convention)
+  if (formatted.length > 0) {
+    formatted = formatted.charAt(0).toUpperCase() + formatted.slice(1)
+  }
+  
+  // Encode the title for URL (handles special characters)
+  const encoded = encodeURIComponent(formatted)
+  
+  return `https://en.wikipedia.org/wiki/${encoded}`
+}
+
+/**
  * Clears the in-memory article cache.
  * 
  * Useful for testing or when starting a fresh game session.

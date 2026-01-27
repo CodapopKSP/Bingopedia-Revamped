@@ -1,20 +1,14 @@
 // Removed getApiBaseUrl import - using direct paths instead
 
 export interface GameStateResponse {
-  hashedId: string // 16-character hashed ID (primary identifier)
-  gameId?: string // UUID v4 (optional, for backward compatibility)
-  gridCells: string[]
-  startingArticle: string
-  gameType: 'random' | 'repeat'
+  link: string
+  bingopediaGame: string[]
   createdAt: string | Date
-  createdBy?: string
+  timesPlayed: number
 }
 
 export interface CreateGamePayload {
-  gridCells: string[]
-  startingArticle: string
-  gameType: 'random' | 'repeat'
-  createdBy?: string
+  bingopediaGame: string[]
 }
 
 /**
@@ -34,11 +28,21 @@ export function isValidHashedId(id: string): boolean {
  * @throws Error if game not found or request fails
  */
 export async function fetchGame(identifier: string): Promise<GameStateResponse> {
-  // Use absolute path - don't manipulate base URL
-  const url = new URL(`/api/games/${identifier}`, window.location.origin)
+  const queryUrl = new URL('/api/games', window.location.origin)
+  queryUrl.searchParams.set('link', identifier)
+  const pathUrl = new URL(`/api/games/${identifier}`, window.location.origin)
 
   try {
-    const response = await fetch(url.toString())
+    const queryResponse = await fetch(queryUrl.toString())
+    if (queryResponse.ok) {
+      const json = (await queryResponse.json()) as GameStateResponse
+      if (!Array.isArray(json.bingopediaGame) || json.bingopediaGame.length !== 26) {
+        throw new Error('Invalid game data received from API.')
+      }
+      return json
+    }
+
+    const response = await fetch(pathUrl.toString())
 
     if (!response.ok) {
       let errorMessage = 'Failed to fetch game'

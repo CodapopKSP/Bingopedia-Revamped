@@ -1,6 +1,9 @@
 import dotenv from 'dotenv';
+import path from 'path';
 
-dotenv.config();
+const rootDir = path.resolve(__dirname, '..');
+dotenv.config({ path: path.join(rootDir, '.env'), override: true });
+dotenv.config({ path: path.join(rootDir, '.env.local'), override: true });
 
 /**
  * MongoDB configuration interface.

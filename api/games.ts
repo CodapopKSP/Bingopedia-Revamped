@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { randomUUID, randomBytes } from 'crypto';
-import { getGamesCollection, type GameState } from './mongoClient';
+import { randomBytes } from 'crypto';
+import { getGamesCollection, type GeneratedGame } from './mongoClient';
 import { createErrorResponse, handleApiError } from './errors';
 
 /**
@@ -56,8 +56,8 @@ function isValidHashedId(hashedId: string): boolean {
  * Vercel serverless function handler for the games API.
  *
  * Supports the following endpoints:
- * - POST /api/games: Creates a new game state
- * - GET /api/games/:gameId: Retrieves a game state by ID
+ * - POST /api/games: Creates a new shareable game entry
+ * - GET /api/games?link=...: Retrieves a shareable game by link
  * - OPTIONS: Handles CORS preflight requests
  *
  * @param req - Vercel request object
@@ -77,64 +77,82 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const collection = await getGamesCollection();
 
+    if (req.method === 'GET') {
+      if (req.query.debug === 'true') {
+        const total = await collection.countDocuments();
+        const recent = await collection
+          .find({}, { projection: { link: 1, createdAt: 1 } })
+          .sort({ createdAt: -1 })
+          .limit(5)
+          .toArray();
+
+        res.status(200).json({
+          collection: 'generated-games',
+          total,
+          recentLinks: recent.map((doc) => ({ link: doc.link, createdAt: doc.createdAt })),
+        });
+        return;
+      }
+
+      const link = ((req.query.link as string) || '').trim();
+
+      if (!isValidHashedId(link)) {
+        res.status(400).json(
+          createErrorResponse(
+            'VALIDATION_ERROR',
+            'Invalid game link format. Expected 16-character link hash',
+            { field: 'link', value: link }
+          )
+        );
+        return;
+      }
+
+      const game = await collection.findOne({ link });
+
+      if (!game) {
+        res.status(404).json(
+          createErrorResponse(
+            'NOT_FOUND',
+            'Game not found',
+            { link }
+          )
+        );
+        return;
+      }
+
+      const { _id, ...gameState } = game;
+      res.status(200).json(gameState);
+      return;
+    }
+
     if (req.method === 'POST') {
-      const { gridCells, startingArticle, gameType, createdBy } = req.body || {};
+      const { bingopediaGame } = req.body || {};
 
-      // Validate gridCells
-      if (!Array.isArray(gridCells) || gridCells.length !== 25) {
+      if (!Array.isArray(bingopediaGame) || bingopediaGame.length !== 26) {
         res.status(400).json(
           createErrorResponse(
             'VALIDATION_ERROR',
-            'gridCells must be an array with exactly 25 elements',
-            { field: 'gridCells', received: Array.isArray(gridCells) ? gridCells.length : typeof gridCells }
-          )
-        );
-        return;
-      }
-
-      // Validate startingArticle
-      if (!startingArticle || typeof startingArticle !== 'string' || startingArticle.trim().length === 0) {
-        res.status(400).json(
-          createErrorResponse(
-            'VALIDATION_ERROR',
-            'startingArticle must be a non-empty string',
-            { field: 'startingArticle', value: startingArticle }
-          )
-        );
-        return;
-      }
-
-      // Validate gameType
-      if (gameType !== 'random' && gameType !== 'repeat') {
-        res.status(400).json(
-          createErrorResponse(
-            'VALIDATION_ERROR',
-            "gameType must be either 'random' or 'repeat'",
-            { field: 'gameType', value: gameType }
+            'bingopediaGame must be an array with exactly 26 elements',
+            { field: 'bingopediaGame', received: Array.isArray(bingopediaGame) ? bingopediaGame.length : typeof bingopediaGame }
           )
         );
         return;
       }
 
       // Generate hashed ID with collision handling (max 3 attempts)
-      let hashedId: string;
+      let link: string;
       let attempts = 0;
       const maxAttempts = 3;
       
       while (attempts < maxAttempts) {
-        hashedId = generateHashedId();
+        link = generateHashedId();
         try {
           // Try to insert with the generated hashedId
-          const gameId = randomUUID(); // Keep UUID for backward compatibility
-          
-          const gameState: GameState = {
-            hashedId,
-            gameId, // Optional, for backward compatibility
-            gridCells: gridCells.map(String),
-            startingArticle: String(startingArticle).trim(),
-            gameType: gameType || 'random',
+          const gameState: GeneratedGame = {
+            link,
+            bingopediaGame: bingopediaGame.map(String),
             createdAt: new Date(),
-            ...(createdBy && { createdBy: String(createdBy).trim() }),
+            timesPlayed: 0,
           };
 
           const result = await collection.insertOne(gameState);

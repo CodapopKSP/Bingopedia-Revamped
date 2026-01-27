@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getLeaderboardCollection, type LeaderboardEntry } from './mongoClient';
+import { getLeaderboardCollection, getGamesCollection, type LeaderboardEntry } from './mongoClient';
 import {
   validateAndSanitizeUsername,
   validateScoreData,
@@ -83,6 +83,10 @@ function applyCors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  // Disable caching for leaderboard API to ensure filters work correctly
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
 }
 
 /**
@@ -132,32 +136,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const sortDirection = sortOrder === 'asc' ? 1 : -1;
 
       // Build date filter
-      // Date filtering uses UTC timezone. dateTo is extended to end of day (23:59:59.999)
-      // to include all entries created on that day.
+      // Date filtering uses UTC timezone
       const dateFilter: Record<string, unknown> = {};
       if (dateFrom || dateTo) {
         dateFilter.createdAt = {};
         if (dateFrom) {
-          // Ensure dateFrom is a Date object (already validated in parseQuery)
           const fromDate = dateFrom instanceof Date ? dateFrom : new Date(dateFrom);
           dateFilter.createdAt.$gte = fromDate;
         }
         if (dateTo) {
-          // Set dateTo to end of day (23:59:59.999) to include all entries on that day
+          // Frontend already sends dateTo as end of day (23:59:59.999), use it directly
           const toDate = dateTo instanceof Date ? dateTo : new Date(dateTo);
-          const endOfDay = new Date(toDate.getTime() + 86400000 - 1); // Add milliseconds for end of day
-          dateFilter.createdAt.$lte = endOfDay;
+          dateFilter.createdAt.$lte = toDate;
         }
       }
+      
+      // Debug logging - check what we actually received
+      console.log('[Leaderboard] Raw query params:', JSON.stringify(req.query));
+      console.log('[Leaderboard] dateFrom in query:', req.query.dateFrom);
+      console.log('[Leaderboard] dateTo in query:', req.query.dateTo);
+      console.log('[Leaderboard] Parsed dates:', {
+        dateFrom: dateFrom?.toISOString(),
+        dateTo: dateTo?.toISOString(),
+        dateFromType: typeof dateFrom,
+        dateToType: typeof dateTo,
+        hasDateFrom: !!dateFrom,
+        hasDateTo: !!dateTo
+      });
 
       // Build gameType filter separately (don't mix with dateFilter)
       const gameTypeFilter: Record<string, unknown> = {};
-      if (gameType !== 'all') {
-        gameTypeFilter.gameType = gameType;
+      if (gameType === 'random') {
+        // Backfill: legacy entries without gameType should be treated as random
+        gameTypeFilter.$or = [{ gameType: 'random' }, { gameType: { $exists: false } }];
+      } else if (gameType === 'repeat') {
+        gameTypeFilter.gameType = 'repeat';
       }
 
       // Merge filters properly
       const queryFilter = { ...dateFilter, ...gameTypeFilter };
+      
+      // Debug logging
+      console.log('[Leaderboard] Date filter:', JSON.stringify(dateFilter, (key, value) => {
+        if (value instanceof Date) return value.toISOString();
+        return value;
+      }));
+      console.log('[Leaderboard] Final query filter:', JSON.stringify(queryFilter, (key, value) => {
+        if (value instanceof Date) return value.toISOString();
+        return value;
+      }));
 
       const totalCount = await collection.countDocuments(queryFilter);
       const totalPages = Math.ceil(totalCount / limit);
@@ -167,12 +194,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         sortObj.createdAt = 1;
       }
 
+      // Debug: Log what we're querying
+      console.log('[Leaderboard] Querying with filter:', JSON.stringify(queryFilter, (key, value) => {
+        if (value instanceof Date) return value.toISOString();
+        if (value && typeof value === 'object' && '$gte' in value) {
+          return { $gte: value.$gte instanceof Date ? value.$gte.toISOString() : value.$gte };
+        }
+        if (value && typeof value === 'object' && '$lte' in value) {
+          return { $lte: value.$lte instanceof Date ? value.$lte.toISOString() : value.$lte };
+        }
+        return value;
+      }));
+      
       const users = (await collection
         .find(queryFilter)
         .sort(sortObj)
         .skip(skip)
         .limit(limit)
         .toArray()) as LeaderboardEntry[];
+      
+      // Debug: Log what we got back
+      console.log('[Leaderboard] Found', users.length, 'entries');
+      if (users.length > 0) {
+        console.log('[Leaderboard] First entry createdAt:', users[0].createdAt);
+      console.log('[Leaderboard] Last entry createdAt:', users[users.length - 1].createdAt);
+      }
+
+      // Debug: Add filter info to response headers for debugging
+      res.setHeader('X-Debug-Filter', JSON.stringify({
+        dateFrom: dateFrom?.toISOString(),
+        dateTo: dateTo?.toISOString(),
+        dateFilter: dateFilter,
+        queryFilter: queryFilter
+      }));
 
       res.status(200).json({
         users,
@@ -191,7 +245,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
-      const { username, score, time, clicks, bingoSquares, history, gameId, gameType } = req.body || {};
+      const { username, score, time, clicks, bingoSquares, history, bingopediaGame, gameId, gameType } = req.body || {};
 
       if (!username || score === undefined) {
         res.status(400).json(
@@ -236,6 +290,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         time: scoreValidation.time,
         clicks: scoreValidation.clicks,
         bingoSquares: Array.isArray(bingoSquares) ? bingoSquares.map(String) : [],
+        ...(Array.isArray(bingopediaGame) && bingopediaGame.length >= 26
+          ? { bingopediaGame: bingopediaGame.map(String) }
+          : {}),
         history: Array.isArray(history) ? history.map(String) : [],
         createdAt: new Date(),
         ...(gameId && { gameId: String(gameId) }),
@@ -244,6 +301,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const result = await collection.insertOne(entry);
       const insertedEntry = { ...entry, _id: result.insertedId };
+
+      if (gameId) {
+        const gamesCollection = await getGamesCollection();
+        await gamesCollection.updateOne({ link: String(gameId) }, { $inc: { timesPlayed: 1 } });
+      }
 
       res.status(201).json(insertedEntry);
       return;

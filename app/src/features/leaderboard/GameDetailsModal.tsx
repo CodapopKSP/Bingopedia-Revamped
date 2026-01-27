@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { LeaderboardEntry, GameGridCell } from '../game/types'
 import { BingoGrid } from '../game/BingoGrid'
 import { HistoryPanel } from '../game/HistoryPanel'
@@ -21,17 +21,9 @@ interface GameDetailsModalProps {
  * @returns Array of grid cell objects compatible with BingoGrid component
  */
 function parseBingoSquares(bingoSquares: string[]): Array<{ id: string; article: CuratedArticle }> {
-  const matchedTitles = new Set<string>()
-  
   return bingoSquares.map((square, index) => {
     const isFound = square.startsWith('[Found] ')
     const title = isFound ? square.replace('[Found] ', '') : square
-    
-    // Normalize for matching
-    const normalized = title.toLowerCase().replace(/_/g, ' ')
-    if (isFound) {
-      matchedTitles.add(normalized)
-    }
     
     // Create a minimal CuratedArticle object
     const article: CuratedArticle = {
@@ -43,6 +35,10 @@ function parseBingoSquares(bingoSquares: string[]): Array<{ id: string; article:
       article,
     }
   })
+}
+
+function stripFoundTag(title: string): string {
+  return title.startsWith('[Found] ') ? title.replace('[Found] ', '') : title
 }
 
 /**
@@ -63,15 +59,28 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
   const [activeTab, setActiveTab] = useState<'board' | 'history'>('board')
   const [summaryModalTitle, setSummaryModalTitle] = useState<string | null>(null)
   const [isReplaying, setIsReplaying] = useState(false)
+  const dialogRef = useRef<HTMLDivElement | null>(null)
+  const previouslyFocusedElementRef = useRef<Element | null>(null)
   
-  const gridCells = entry.bingoSquares ? parseBingoSquares(entry.bingoSquares) : []
+  const boardSquares =
+    entry.bingoSquares?.slice(0, 25) ??
+    entry.bingopediaGame?.slice(0, 25) ??
+    []
+  const gridCells = boardSquares.length > 0 ? parseBingoSquares(boardSquares) : []
   const matchedArticles = new Set<string>()
   
-  // Extract matched articles from bingoSquares that have [Found] markers
-  if (entry.bingoSquares) {
-    entry.bingoSquares.forEach((square) => {
+  // Prefer "[Found]" tags from history; fall back to board markers for legacy entries
+  const historyHasFound = entry.history?.some((title) => title.startsWith('[Found] ')) ?? false
+  if (historyHasFound && entry.history) {
+    entry.history.forEach((title) => {
+      if (title.startsWith('[Found] ')) {
+        matchedArticles.add(stripFoundTag(title).toLowerCase().replace(/_/g, ' '))
+      }
+    })
+  } else if (boardSquares.length > 0) {
+    boardSquares.forEach((square) => {
       if (square.startsWith('[Found] ')) {
-        const title = square.replace('[Found] ', '')
+        const title = stripFoundTag(square)
         matchedArticles.add(title.toLowerCase().replace(/_/g, ' '))
       }
     })
@@ -80,9 +89,13 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
   // Calculate winning cells (simplified - we don't store this in the entry)
   const winningCells: number[] = []
   
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     onClose()
-  }
+    // Restore focus to the element that launched the modal, if any
+    if (previouslyFocusedElementRef.current instanceof HTMLElement) {
+      previouslyFocusedElementRef.current.focus()
+    }
+  }, [onClose])
 
   const handleCellClick = (articleTitle: string) => {
     setSummaryModalTitle(articleTitle)
@@ -101,10 +114,21 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
           gameId: entry.gameId,
           gameType: 'repeat',
         })
+      } else if (entry.bingopediaGame && entry.bingopediaGame.length >= 26) {
+        // Reconstruct from bingopediaGame (25 board + starting article)
+        const startingTitle = stripFoundTag(entry.bingopediaGame[25])
+        const startingArticle: CuratedArticle = {
+          title: startingTitle,
+        }
+        await onReplay({
+          gridCells,
+          startingArticle,
+          gameType: 'repeat',
+        })
       } else if (entry.bingoSquares && entry.history && entry.history.length > 0) {
         // Reconstruct from bingoSquares and history
         const startingArticle: CuratedArticle = {
-          title: entry.history[0],
+          title: stripFoundTag(entry.history[0]),
         }
         await onReplay({
           gridCells,
@@ -112,7 +136,7 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
           gameType: 'repeat',
         })
       } else {
-        console.error('Cannot replay: missing gameId, bingoSquares, or history')
+        console.error('Cannot replay: missing gameId or game data')
       }
     } catch (error) {
       console.error('Failed to replay game:', error)
@@ -121,21 +145,97 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
     }
   }
 
+  // Basic focus trapping within the modal dialog
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        handleClose()
+    previouslyFocusedElementRef.current = document.activeElement
+
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    const focusableSelectors = [
+      'a[href]',
+      'button:not([disabled])',
+      'textarea:not([disabled])',
+      'input[type="text"]:not([disabled])',
+      'input[type="radio"]:not([disabled])',
+      'input[type="checkbox"]:not([disabled])',
+      'select:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(', ')
+
+    const getFocusableElements = () =>
+      Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors)).filter(
+        (el) => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'),
+      )
+
+    const focusFirstElement = () => {
+      const focusable = getFocusableElements()
+      if (focusable.length > 0) {
+        focusable[0].focus()
+      } else {
+        dialog.focus()
       }
     }
-    window.addEventListener('keydown', handleEscape)
-    return () => window.removeEventListener('keydown', handleEscape)
-  }, [])
+
+    // Move initial focus into the dialog
+    focusFirstElement()
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        handleClose()
+        return
+      }
+
+      if (e.key === 'Tab') {
+        const focusable = getFocusableElements()
+        if (focusable.length === 0) {
+          e.preventDefault()
+          return
+        }
+
+        const currentIndex = focusable.indexOf(document.activeElement as HTMLElement)
+        let nextIndex = currentIndex
+
+        if (e.shiftKey) {
+          // Shift + Tab: backwards
+          nextIndex = currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1
+        } else {
+          // Tab: forwards
+          nextIndex = currentIndex === focusable.length - 1 ? 0 : currentIndex + 1
+        }
+
+        e.preventDefault()
+        focusable[nextIndex].focus()
+      }
+    }
+
+    dialog.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      dialog.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [handleClose])
 
   return (
-    <div className="bp-modal-overlay bp-game-details-overlay" onClick={handleClose}>
-      <div className="bp-modal-content bp-game-details-content" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="bp-modal-overlay bp-game-details-overlay"
+      onClick={handleClose}
+      aria-hidden="true"
+    >
+      <div
+        className="bp-modal-content bp-game-details-content"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bp-game-details-title"
+        ref={dialogRef}
+        tabIndex={-1}
+      >
         <div className="bp-modal-header">
-          <h3 className="bp-modal-title">Game Details: {entry.username}</h3>
+          <h3 className="bp-modal-title" id="bp-game-details-title">
+            Game Details: {entry.username}
+          </h3>
           <button className="bp-modal-close" onClick={handleClose} aria-label="Close">
             ✕
           </button>
@@ -163,7 +263,10 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
               </div>
             )}
           </div>
-          {onReplay && (entry.gameId || (entry.bingoSquares && entry.history && entry.history.length > 0)) && (
+          {onReplay &&
+            (entry.gameId ||
+              (entry.bingopediaGame && entry.bingopediaGame.length >= 26) ||
+              (entry.bingoSquares && entry.history && entry.history.length > 0)) && (
             <div className="bp-game-details-actions">
               <button
                 type="button"
@@ -197,35 +300,32 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
           </div>
           
           <div className="bp-game-details-content-area">
-            {activeTab === 'board' && gridCells.length > 0 && (
-              <div className="bp-game-details-board">
+            {/* Render both tabs in same container, toggle visibility to prevent layout shifts */}
+            <div className={`bp-game-details-board ${activeTab === 'board' ? 'bp-game-details-tab-active' : 'bp-game-details-tab-hidden'}`}>
+              {gridCells.length > 0 ? (
                 <BingoGrid
                   gridCells={gridCells}
                   matchedArticles={matchedArticles}
                   winningCells={winningCells}
                   onCellClick={handleCellClick}
                 />
-              </div>
-            )}
+              ) : (
+                <p className="bp-game-details-empty">No board data available for this entry.</p>
+              )}
+            </div>
             
-            {activeTab === 'history' && entry.history && entry.history.length > 0 && (
-              <div className="bp-game-details-history">
+            <div className={`bp-game-details-history ${activeTab === 'history' ? 'bp-game-details-tab-active' : 'bp-game-details-tab-hidden'}`}>
+              {entry.history && entry.history.length > 0 ? (
                 <HistoryPanel
                   history={entry.history}
                   onArticleClick={() => {}} // Read-only in details view
                   selectedArticle={null}
                   gridCells={gridCells}
                 />
-              </div>
-            )}
-            
-            {activeTab === 'board' && gridCells.length === 0 && (
-              <p className="bp-game-details-empty">No board data available for this entry.</p>
-            )}
-            
-            {activeTab === 'history' && (!entry.history || entry.history.length === 0) && (
-              <p className="bp-game-details-empty">No history data available for this entry.</p>
-            )}
+              ) : (
+                <p className="bp-game-details-empty">No history data available for this entry.</p>
+              )}
+            </div>
           </div>
         </div>
       </div>

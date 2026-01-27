@@ -1,23 +1,36 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { randomBytes } from 'crypto';
 import { getServerPort } from '../api/config';
-import { getLeaderboardCollection, type LeaderboardEntry } from '../api/mongoClient';
+import { getLeaderboardCollection, getGamesCollection, type LeaderboardEntry, type GeneratedGame } from '../api/mongoClient';
 import {
   validateAndSanitizeUsername,
   validateScoreData,
 } from '../api/validation';
 import { createErrorResponse, handleApiError } from '../api/errors';
 
-dotenv.config();
+const rootDir = path.resolve(__dirname, '..');
+dotenv.config({ path: path.join(rootDir, '.env'), override: true });
+dotenv.config({ path: path.join(rootDir, '.env.local'), override: true });
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
+function generateLink(): string {
+  return randomBytes(12).toString('base64url').substring(0, 16);
+}
+
 app.get('/api/leaderboard', async (req, res) => {
   try {
+    // Disable caching for leaderboard API to ensure filters work correctly
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     const collection = await getLeaderboardCollection();
 
     const limit = Math.max(parseInt((req.query.limit as string) ?? '10', 10) || 10, 1);
@@ -32,7 +45,69 @@ app.get('/api/leaderboard', async (req, res) => {
 
     const skip = (page - 1) * limit;
 
-    const totalCount = await collection.countDocuments({});
+    // Parse and validate date parameters
+    let dateFrom: Date | undefined;
+    let dateTo: Date | undefined;
+
+    if (req.query.dateFrom) {
+      dateFrom = new Date(req.query.dateFrom as string);
+      if (isNaN(dateFrom.getTime())) {
+        res.status(400).json(
+          createErrorResponse('VALIDATION_ERROR', 'Invalid dateFrom format. Expected ISO date string', { field: 'dateFrom', value: req.query.dateFrom })
+        );
+        return;
+      }
+    }
+
+    if (req.query.dateTo) {
+      dateTo = new Date(req.query.dateTo as string);
+      if (isNaN(dateTo.getTime())) {
+        res.status(400).json(
+          createErrorResponse('VALIDATION_ERROR', 'Invalid dateTo format. Expected ISO date string', { field: 'dateTo', value: req.query.dateTo })
+        );
+        return;
+      }
+    }
+
+    // Validate date range
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      res.status(400).json(
+        createErrorResponse('VALIDATION_ERROR', 'dateFrom must be before or equal to dateTo', { dateFrom, dateTo })
+      );
+      return;
+    }
+
+    // Parse and validate gameType
+    const gameType = (req.query.gameType as string) || 'random';
+    if (gameType !== 'random' && gameType !== 'repeat' && gameType !== 'all') {
+      res.status(400).json(
+        createErrorResponse('VALIDATION_ERROR', "gameType must be 'random', 'repeat', or 'all'", { field: 'gameType', value: gameType })
+      );
+      return;
+    }
+
+    // Build date filter
+    const dateFilter: Record<string, unknown> = {};
+    if (dateFrom || dateTo) {
+      dateFilter.createdAt = {};
+      if (dateFrom) {
+        dateFilter.createdAt = { ...dateFilter.createdAt as Record<string, unknown>, $gte: dateFrom };
+      }
+      if (dateTo) {
+        dateFilter.createdAt = { ...dateFilter.createdAt as Record<string, unknown>, $lte: dateTo };
+      }
+    }
+
+    // Build gameType filter
+    const gameTypeFilter: Record<string, unknown> = {};
+    if (gameType !== 'all') {
+      gameTypeFilter.gameType = gameType;
+    }
+
+    // Merge filters
+    const queryFilter = { ...dateFilter, ...gameTypeFilter };
+
+    const totalCount = await collection.countDocuments(queryFilter);
     const totalPages = Math.ceil(totalCount / limit);
 
     const sortObj: Record<string, 1 | -1> = { [sortField]: sortDirection };
@@ -41,7 +116,7 @@ app.get('/api/leaderboard', async (req, res) => {
     }
 
     const users = (await collection
-      .find({})
+      .find(queryFilter)
       .sort(sortObj)
       .skip(skip)
       .limit(limit)
@@ -71,7 +146,7 @@ app.get('/api/leaderboard', async (req, res) => {
 app.post('/api/leaderboard', async (req, res) => {
   try {
     const collection = await getLeaderboardCollection();
-    const { username, score, time, clicks, bingoSquares, history } = req.body || {};
+    const { username, score, time, clicks, bingoSquares, history, gameId } = req.body || {};
 
     if (!username || score === undefined) {
       res.status(400).json(
@@ -121,10 +196,177 @@ app.post('/api/leaderboard', async (req, res) => {
     const result = await collection.insertOne(entry);
     const insertedEntry = { ...entry, _id: result.insertedId };
 
+    if (gameId) {
+      const gamesCollection = await getGamesCollection();
+      await gamesCollection.updateOne({ link: String(gameId) }, { $inc: { timesPlayed: 1 } });
+    }
+
     res.status(201).json(insertedEntry);
   } catch (error) {
     console.error('Error saving score:', error);
     const errorResponse = handleApiError(error, 'POST');
+    const status = errorResponse.error.code === 'DATABASE_ERROR' ? 503 : 500;
+    res.status(status).json(errorResponse);
+  }
+});
+
+app.post('/api/games', async (req, res) => {
+  try {
+    const collection = await getGamesCollection();
+    const { bingopediaGame } = req.body || {};
+
+    if (!Array.isArray(bingopediaGame) || bingopediaGame.length !== 26) {
+      res.status(400).json(
+        createErrorResponse(
+          'VALIDATION_ERROR',
+          'bingopediaGame must be an array with exactly 26 elements',
+          { field: 'bingopediaGame', received: Array.isArray(bingopediaGame) ? bingopediaGame.length : typeof bingopediaGame }
+        )
+      );
+      return;
+    }
+
+    let link = '';
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      link = generateLink();
+      try {
+        const gameState: GeneratedGame = {
+          link,
+          bingopediaGame: bingopediaGame.map(String),
+          createdAt: new Date(),
+          timesPlayed: 0,
+        };
+
+        const result = await collection.insertOne(gameState);
+        const insertedGame = { ...gameState, _id: result.insertedId };
+        res.status(201).json(insertedGame);
+        return;
+      } catch (error) {
+        const err = error as Error;
+        if (err.message.includes('duplicate key') || err.message.includes('E11000')) {
+          attempts += 1;
+          if (attempts >= maxAttempts) {
+            res.status(500).json(
+              createErrorResponse(
+                'SERVER_ERROR',
+                'Failed to generate unique game link. Please try again.',
+                { attempts: maxAttempts }
+              )
+            );
+            return;
+          }
+          continue;
+        }
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.error('Error creating shareable game:', error);
+    const errorResponse = handleApiError(error, 'POST');
+    const status = errorResponse.error.code === 'DATABASE_ERROR' ? 503 : 500;
+    res.status(status).json(errorResponse);
+  }
+});
+
+app.get('/api/games/debug', async (_req, res) => {
+  try {
+    const collection = await getGamesCollection();
+    const total = await collection.countDocuments();
+    const recent = await collection
+      .find({}, { projection: { link: 1, createdAt: 1 } })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .toArray();
+
+    res.json({
+      collection: 'generated-games',
+      total,
+      recentLinks: recent.map((doc) => ({ link: doc.link, createdAt: doc.createdAt })),
+    });
+  } catch (error) {
+    console.error('Error fetching games debug info:', error);
+    const errorResponse = handleApiError(error, 'GET');
+    const status = errorResponse.error.code === 'DATABASE_ERROR' ? 503 : 500;
+    res.status(status).json(errorResponse);
+  }
+});
+
+app.get('/api/games/:link([A-Za-z0-9_-]{16})', async (req, res) => {
+  try {
+    const collection = await getGamesCollection();
+    const link = (req.params.link || '').trim();
+
+    if (!link || !/^[A-Za-z0-9_-]{16}$/.test(link)) {
+      res.status(400).json(
+        createErrorResponse(
+          'VALIDATION_ERROR',
+          'Invalid game link format. Expected 16-character link hash',
+          { field: 'link', value: link }
+        )
+      );
+      return;
+    }
+
+    const game = await collection.findOne({ link });
+
+    if (!game) {
+      res.status(404).json(
+        createErrorResponse(
+          'NOT_FOUND',
+          'Game not found',
+          { link }
+        )
+      );
+      return;
+    }
+
+    const { _id, ...gameState } = game;
+    res.json(gameState);
+  } catch (error) {
+    console.error('Error fetching shareable game:', error);
+    const errorResponse = handleApiError(error, 'GET');
+    const status = errorResponse.error.code === 'DATABASE_ERROR' ? 503 : 500;
+    res.status(status).json(errorResponse);
+  }
+});
+
+app.get('/api/games', async (req, res) => {
+  try {
+    const collection = await getGamesCollection();
+    const link = ((req.query.link as string) || '').trim();
+
+    if (!link || !/^[A-Za-z0-9_-]{16}$/.test(link)) {
+      res.status(400).json(
+        createErrorResponse(
+          'VALIDATION_ERROR',
+          'Invalid game link format. Expected 16-character link hash',
+          { field: 'link', value: link }
+        )
+      );
+      return;
+    }
+
+    const game = await collection.findOne({ link });
+
+    if (!game) {
+      res.status(404).json(
+        createErrorResponse(
+          'NOT_FOUND',
+          'Game not found',
+          { link }
+        )
+      );
+      return;
+    }
+
+    const { _id, ...gameState } = game;
+    res.json(gameState);
+  } catch (error) {
+    console.error('Error fetching shareable game:', error);
+    const errorResponse = handleApiError(error, 'GET');
     const status = errorResponse.error.code === 'DATABASE_ERROR' ? 503 : 500;
     res.status(status).json(errorResponse);
   }

@@ -6,8 +6,7 @@ import { ArticleSummaryModal } from './ArticleSummaryModal'
 import { WinModal } from './WinModal'
 import { Confetti } from './Confetti'
 import { ArticleViewer } from '../article-viewer/ArticleViewer'
-import { useTimerDisplay } from './useTimerDisplay'
-import { formatTime } from '../../shared/utils/timeFormat'
+import { TimerDisplay } from './TimerDisplay'
 import './GameScreen.css'
 
 interface GameScreenProps {
@@ -35,14 +34,12 @@ interface GameScreenProps {
  */
 export function GameScreen({ state, controls, onBackToStart, onMatchCallbackReady }: GameScreenProps) {
   const { clickCount, elapsedSeconds, gameWon, currentArticleTitle, gridCells, matchedArticles, winningCells, articleHistory, articleLoading, gameId, gameType } = state
+  const { registerNavigation, setArticleLoading, replaceFailedArticle } = controls
   const [summaryModalTitle, setSummaryModalTitle] = useState<string | null>(null)
   const [showWinModal, setShowWinModal] = useState(false)
   const [showWinConfetti, setShowWinConfetti] = useState(false)
   const [showMatchConfetti, setShowMatchConfetti] = useState(false)
   const [bingoBoardOpen, setBingoBoardOpen] = useState(false)
-  
-  // Use debounced timer display to minimize re-renders
-  const displaySeconds = useTimerDisplay(elapsedSeconds)
 
   useEffect(() => {
     if (gameWon && !showWinModal && !showWinConfetti) {
@@ -76,16 +73,16 @@ export function GameScreen({ state, controls, onBackToStart, onMatchCallbackRead
   }, [])
 
   const handleHistoryClick = useCallback(async (title: string) => {
-    await controls.registerNavigation(title)
-  }, [controls])
+    await registerNavigation(title)
+  }, [registerNavigation])
 
   const handleArticleClick = useCallback(async (title: string) => {
-    await controls.registerNavigation(title)
-  }, [controls])
+    await registerNavigation(title)
+  }, [registerNavigation])
 
   const handleArticleLoadFailure = useCallback(async (title: string) => {
-    await controls.replaceFailedArticle(title)
-  }, [controls])
+    await replaceFailedArticle(title)
+  }, [replaceFailedArticle])
 
   return (
     <div className="bp-game-screen">
@@ -118,9 +115,12 @@ export function GameScreen({ state, controls, onBackToStart, onMatchCallbackRead
         </button>
         <div className="bp-game-metrics">
           <span>Clicks: {clickCount}</span>
-          <span className={articleLoading ? 'bp-game-timer bp-game-timer--paused' : 'bp-game-timer'}>
-            Time: {formatTime(displaySeconds)}
-          </span>
+          <TimerDisplay
+            elapsedSeconds={elapsedSeconds}
+            className={articleLoading ? 'bp-game-timer bp-game-timer--paused' : 'bp-game-timer'}
+            prefix="Time: "
+            isPausedForLoading={!state.timerRunning && articleLoading}
+          />
         </div>
       </div>
       {/* Mobile toggle button */}
@@ -157,7 +157,11 @@ export function GameScreen({ state, controls, onBackToStart, onMatchCallbackRead
             ← New Game
           </button>
           <div className="bp-game-metrics">
-            <span>Time: {formatTime(displaySeconds)}</span>
+            <TimerDisplay 
+              elapsedSeconds={elapsedSeconds} 
+              prefix="Time: "
+              isPausedForLoading={!state.timerRunning && articleLoading}
+            />
             <span>Clicks: {clickCount}</span>
             {gameWon && (
               <span className="bp-game-status bp-game-status--won">
@@ -184,8 +188,7 @@ export function GameScreen({ state, controls, onBackToStart, onMatchCallbackRead
         <ArticleViewer
           articleTitle={currentArticleTitle}
           onArticleClick={handleArticleClick}
-          onArticleLoadFailure={handleArticleLoadFailure}
-          onLoadingChange={controls.setArticleLoading}
+          onLoadingChange={setArticleLoading}
           gameWon={gameWon}
         />
       </section>

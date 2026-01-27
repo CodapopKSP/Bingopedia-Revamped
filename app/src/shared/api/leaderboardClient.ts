@@ -37,6 +37,10 @@ export async function fetchLeaderboard(params: FetchLeaderboardParams = {}): Pro
   if (params.dateTo) url.searchParams.set('dateTo', params.dateTo)
   if (params.gameType) url.searchParams.set('gameType', params.gameType)
 
+  // Debug: Log the actual URL being requested
+  console.log('[Leaderboard Client] Request URL:', url.toString())
+  console.log('[Leaderboard Client] Params:', { dateFrom: params.dateFrom, dateTo: params.dateTo })
+
   try {
     const response = await fetch(url.toString())
     
@@ -92,6 +96,7 @@ export interface SubmitScorePayload {
   clicks: number
   score: number
   bingoSquares: string[]
+  bingopediaGame?: string[]
   history: string[]
   gameId?: string
   gameType?: 'random' | 'repeat'

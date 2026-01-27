@@ -30,12 +30,19 @@ function enforceCacheLimit() {
  * Uses the Wikipedia Query API with redirects=1 to follow redirect chains.
  * Results are cached by normalized title to avoid repeated API calls.
  * 
+ * Returns the canonical title with proper capitalization (as Wikipedia uses it).
+ * This canonical title should be used for:
+ * - URL construction (via buildWikipediaUrl)
+ * - Display purposes
+ * 
+ * For comparison/matching, normalize the result using normalizeTitle().
+ * 
  * If no redirect exists, returns the original title.
  * If the API call fails, gracefully falls back to the original title (does not throw).
  * This matches the old codebase behavior and prevents network issues from breaking the game.
  * 
  * @param title - The article title (may be a redirect)
- * @returns Promise resolving to the canonical/non-redirect title (or original title on error)
+ * @returns Promise resolving to the canonical/non-redirect title with proper capitalization (or original title on error)
  */
 export async function resolveRedirect(title: string): Promise<string> {
   const key = normalizeTitle(title)
@@ -66,28 +73,41 @@ export async function resolveRedirect(title: string): Promise<string> {
 
     if (!response.ok) {
       console.warn(`Failed to resolve redirect for "${title}": HTTP ${response.status}. Using original title.`)
-      const normalizedOriginal = normalizeTitle(title)
+      // Return original title (with proper capitalization preserved)
       enforceCacheLimit()
-      REDIRECT_CACHE.set(key, normalizedOriginal)
-      return normalizedOriginal
+      REDIRECT_CACHE.set(key, title)
+      return title
     }
 
     const data = (await response.json()) as {
-      query?: { redirects?: Array<{ to: string }> }
+      query?: { redirects?: Array<{ to: string }>; pages?: Record<string, { title: string }> }
     }
 
-    const resolved = data.query?.redirects?.[0]?.to ?? title
-    const normalizedResolved = normalizeTitle(resolved)
+    // Get the canonical title from the redirects array or pages object
+    let resolved = title
+    if (data.query?.redirects && data.query.redirects.length > 0) {
+      // Use the 'to' field from redirects (canonical title with proper capitalization)
+      resolved = data.query.redirects[0].to
+    } else if (data.query?.pages) {
+      // If no redirect, get the title from the pages object
+      const pageIds = Object.keys(data.query.pages)
+      if (pageIds.length > 0 && pageIds[0] !== '-1') {
+        const page = data.query.pages[pageIds[0]]
+        resolved = page.title
+      }
+    }
+
+    // Cache by normalized key, but return canonical title with proper capitalization
     enforceCacheLimit()
-    REDIRECT_CACHE.set(key, normalizedResolved)
-    return normalizedResolved
+    REDIRECT_CACHE.set(key, resolved)
+    return resolved
   } catch (error) {
     // Network errors or other failures: gracefully fall back to original title
     console.warn(`Error resolving redirect for "${title}":`, error instanceof Error ? error.message : String(error))
-    const normalizedOriginal = normalizeTitle(title)
+    // Return original title (with proper capitalization preserved)
     enforceCacheLimit()
-    REDIRECT_CACHE.set(key, normalizedOriginal)
-    return normalizedOriginal
+    REDIRECT_CACHE.set(key, title)
+    return title
   }
 }
 

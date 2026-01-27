@@ -1,5 +1,6 @@
 import type { GameGridCell, GridIndex } from './types'
 import { getCuratedArticleTitle } from '../../shared/data/types'
+import { normalizeTitle } from '../../shared/wiki/normalizeTitle'
 
 /**
  * All 12 possible winning lines in a 5×5 bingo grid:
@@ -51,7 +52,8 @@ export function detectWinningCells(
     const isLineWinning = line.every((index) => {
       const cell = gridCells[index]
       const title = cell ? getCuratedArticleTitle(cell.article) : ''
-      return title && matchedTitles.has(title.toLowerCase())
+      const normalized = title ? normalizeTitle(title) : ''
+      return normalized && matchedTitles.has(normalized)
     })
 
     if (isLineWinning) {

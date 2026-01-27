@@ -46,6 +46,13 @@
   text-decoration: underline;
 }
 
+.bp-timer-paused-message {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  font-style: italic;
+  margin-left: 0.25rem;
+}
+
 .bp-game-metrics {
   display: flex;
   gap: 1rem;

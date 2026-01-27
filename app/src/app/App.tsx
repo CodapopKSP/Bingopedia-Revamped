@@ -66,7 +66,7 @@ export function App() {
           // Still allow starting a new game
         })
     }
-  }, [controls])
+  }, [])
 
   const handleStart = async () => {
     setGameLoadError(null)

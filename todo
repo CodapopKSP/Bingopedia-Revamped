@@ -1,0 +1,35 @@
+LucasArts -> Lucasfilm_Games
+Fermentation in food processing -> Fermented food
+https://en.wikipedia.org/wiki/Category%3AMilitary_history_of_Canada
+When clicking a link, it doesn't start loading the new article right away, so it isn't clear if the link click registered
+Sometimes clicks get ignored, and I think it's because the website seems to refresh every second. The links flash every second when you hover them.
+Going to the same article twice in a row shouldn't count a click and shouldn't show up in the history
+Needs table of contents in the article viewer to quickly jump sections. Should be the same ToC as Wikipedia.
+If an article fails to load in the viewer, it should try again
+
+
+Got this error when I reached a bingo square
+
+Uncaught ReferenceError: useRef is not defined
+    useGameState useGameState.ts:519
+    App App.tsx:23
+    React 13
+    performReactRefresh @react-refresh:228
+    performReactRefresh @react-refresh:217
+    enqueueUpdate @react-refresh:604
+useGameState.ts:519:32
+Loading module from “http://localhost:5173/src/features/game/useGameState.ts?t=1769441044392” was blocked because of a disallowed MIME type (“”).
+localhost:5173
+Loading failed for the module with source “http://localhost:5173/src/features/game/useGameState.ts?t=1769441044392”. App.tsx
+Uncaught TypeError: can't access property "length", prevDeps is undefined
+    React 4
+    useGameState useGameState.ts:205
+    App App.tsx:23
+    React 14
+    performReactRefresh @react-refresh:228
+    performReactRefresh @react-refresh:217
+    enqueueUpdate @react-refresh:604
+react-dom-client.development.js:7611:27
+
+​
+

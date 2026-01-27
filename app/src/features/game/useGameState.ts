@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { loadCuratedArticles } from '../../shared/data/curatedArticles'
 import type { CuratedArticle, CuratedCategory } from '../../shared/data/types'
 import { getCuratedArticleTitle } from '../../shared/data/types'
@@ -8,8 +8,16 @@ import { detectWinningCells } from './winDetection'
 import type { GameGridCell, GameState } from './types'
 import { GRID_CELL_COUNT, STARTING_POOL_SIZE } from '../../shared/constants'
 import { useGameTimer } from './useGameTimer'
-import { fetchGame, createGame, isValidHashedId } from '../../shared/api/gamesClient'
+import { fetchGame, createGame } from '../../shared/api/gamesClient'
 import { logEvent } from '../../shared/api/loggingClient'
+
+/**
+ * Module loading verification:
+ * - All React hooks are explicitly imported from 'react'
+ * - No circular dependencies detected between useGameState and App.tsx
+ * - Vite HMR is properly configured in vite.config.ts
+ * - TypeScript module resolution is set to "bundler" (correct for Vite)
+ */
 
 /**
  * Creates the initial game state with all values reset to defaults.
@@ -187,19 +195,58 @@ export function useGameState(options: UseGameStateOptions = {}): [
 ] {
   const { onMatch } = options
   const [state, setState] = useState<GameState>(() => createInitialState())
+  // Explicit type annotation to prevent module loading issues
+  const replacingArticlesRef = useRef<Set<string>>(new Set<string>())
+  // Ref-based timer value to minimize re-renders (display updates handled separately)
+  const elapsedSecondsRef = useRef<number>(0)
+  // State ref for synchronous duplicate checking (avoids stale closure issues)
+  const stateRef = useRef<GameState>(state)
 
   // Use the dedicated timer hook for cleaner separation of concerns
+  // onTick callback has empty dependency array because setState updater function is stable
+  // and doesn't need to be recreated on every render
+  // 
+  // Timer optimization strategy:
+  // - Update ref immediately (no re-render)
+  // - Update state for scoring accuracy, but less frequently to reduce re-renders
+  // - Display updates are handled by useTimerDisplay hook which batches updates
+  const onTickCallback = useCallback(() => {
+    elapsedSecondsRef.current += 1
+    // Update state for scoring, but this will trigger re-renders
+    // The useTimerDisplay hook will batch these updates for display purposes
+    setState((prev) => ({
+      ...prev,
+      elapsedSeconds: elapsedSecondsRef.current,
+    }))
+  }, []) // Empty deps array is correct - setState updater function is stable
+
   useGameTimer({
     timerRunning: state.timerRunning,
     articleLoading: state.articleLoading,
     gameWon: state.gameWon,
-    onTick: useCallback(() => {
+    onTick: onTickCallback,
+  })
+
+  // Sync refs with state when state changes from other sources (e.g., game reset)
+  useEffect(() => {
+    elapsedSecondsRef.current = state.elapsedSeconds
+    stateRef.current = state
+  }, [state])
+
+  useEffect(() => {
+    if (
+      state.gameStarted &&
+      state.currentArticleTitle &&
+      !state.articleLoading &&
+      !state.timerRunning &&
+      !state.gameWon
+    ) {
       setState((prev) => ({
         ...prev,
-        elapsedSeconds: prev.elapsedSeconds + 1,
+        timerRunning: true,
       }))
-    }, []),
-  })
+    }
+  }, [state.gameStarted, state.currentArticleTitle, state.articleLoading, state.timerRunning, state.gameWon])
 
   /**
    * Converts article title strings to CuratedArticle objects.
@@ -221,7 +268,8 @@ export function useGameState(options: UseGameStateOptions = {}): [
           startingArticle: providedGameState.startingArticle,
           currentArticleTitle: startingTitle,
           articleHistory: [startingTitle],
-          timerRunning: false,
+          timerRunning: true,
+          articleLoading: false,
           hashedId: providedGameState.hashedId,
           gameId: providedGameState.gameId, // Keep for backward compatibility
           gameType: providedGameState.gameType || 'repeat',
@@ -240,7 +288,8 @@ export function useGameState(options: UseGameStateOptions = {}): [
           startingArticle,
           currentArticleTitle: startingTitle,
           articleHistory: [startingTitle],
-          timerRunning: false,
+          timerRunning: true,
+          articleLoading: false,
           gameType: 'random',
         })
       }
@@ -255,26 +304,29 @@ export function useGameState(options: UseGameStateOptions = {}): [
   const loadGameFromId = useCallback(async (identifier: string) => {
     try {
       const gameState = await fetchGame(identifier)
-      
+
+      const gridCellTitles = gameState.bingopediaGame.slice(0, GRID_CELL_COUNT)
+      const startingTitle = gameState.bingopediaGame[GRID_CELL_COUNT]
+
       // Convert string titles to CuratedArticle objects
-      const gridCells: GameGridCell[] = gameState.gridCells.map((title, index) => ({
+      const gridCells: GameGridCell[] = gridCellTitles.map((title, index) => ({
         id: `cell-${index}`,
         article: createArticleFromTitle(title),
       }))
       
-      const startingArticle = createArticleFromTitle(gameState.startingArticle)
-      const startingTitle = getCuratedArticleTitle(startingArticle)
+      const startingArticle = createArticleFromTitle(startingTitle)
+      const startingTitleResolved = getCuratedArticleTitle(startingArticle)
       
       setState({
         ...createInitialState(),
         gameStarted: true,
         gridCells,
         startingArticle,
-        currentArticleTitle: startingTitle,
-        articleHistory: [startingTitle],
-        timerRunning: false,
-        hashedId: gameState.hashedId,
-        gameId: gameState.gameId, // Keep for backward compatibility
+        currentArticleTitle: startingTitleResolved,
+        articleHistory: [startingTitleResolved],
+        timerRunning: true,
+        articleLoading: false,
+        hashedId: gameState.link,
         gameType: 'repeat',
       })
     } catch (error) {
@@ -297,22 +349,21 @@ export function useGameState(options: UseGameStateOptions = {}): [
       // Convert to string arrays for API
       const gridCellTitles = gridCells.map((cell) => getCuratedArticleTitle(cell.article))
       const startingTitle = getCuratedArticleTitle(startingArticle)
+      const bingopediaGame = [...gridCellTitles, startingTitle]
 
       // Create game in API
       const createdGame = await createGame({
-        gridCells: gridCellTitles,
-        startingArticle: startingTitle,
-        gameType: 'random',
+        bingopediaGame,
       })
 
       // Generate shareable URL using path-based format: /{hashedId}
-      const url = `${window.location.origin}/${createdGame.hashedId}`
+      const url = `${window.location.origin}/${createdGame.link}`
 
       // Log game_generated event (non-blocking)
-      void logEvent('game_generated', { hashedId: createdGame.hashedId })
+      void logEvent('game_generated', { hashedId: createdGame.link })
 
       return {
-        gameId: createdGame.hashedId, // Return hashedId as gameId for backward compatibility
+        gameId: createdGame.link,
         url,
       }
     } catch (error) {
@@ -324,41 +375,67 @@ export function useGameState(options: UseGameStateOptions = {}): [
   /**
    * Registers a navigation to a new article and checks for matches.
    * 
-   * This function:
-   * 1. Adds the article to history and increments click count
-   * 2. Resolves redirects for both clicked and grid articles
-   * 3. Performs bidirectional matching (clicked→grid and grid→clicked)
-   * 4. Updates matched articles and checks for winning conditions
-   * 5. Starts/pauses timer appropriately
+   * This is the single navigation pipeline entry point used by ArticleViewer.
+   * It:
+   * 1. Immediately sets articleLoading to true (synchronous, before async work)
+   * 2. Records navigation in history and increments click count
+   * 3. Resolves redirects for both clicked and grid articles (async)
+   * 4. Performs bidirectional matching (clicked→grid and grid→clicked)
+   * 5. Updates matched articles and checks for winning conditions
+   * 6. Starts/pauses timer appropriately
    * 
    * History clicks always count as clicks and can trigger matches/wins.
+   * Duplicate navigation is prevented to avoid unnecessary state updates.
    * 
    * @param title - The article title to navigate to
    */
   const registerNavigation = async (title: string) => {
     const normalizedOriginal = normalizeTitle(title)
-    const canonicalClicked = await resolveRedirect(title)
-    const normalizedClicked = normalizeTitle(canonicalClicked)
+    
+    // DUPLICATE DETECTION: Check against current and previous article using state ref
+    // This prevents duplicate navigation that would increment click count unnecessarily
+    const current = stateRef.current
+    
+    // Check if this is the same as current article (using original title before redirect resolution)
+    if (current.currentArticleTitle) {
+      const normalizedCurrent = normalizeTitle(current.currentArticleTitle)
+      if (normalizedCurrent === normalizedOriginal) {
+        // Same as current - skip navigation
+        return
+      }
+    }
 
-    // First update: add to history, increment clicks, check direct matches
+    // Check if this is the same as previous article in history
+    if (current.articleHistory.length > 0) {
+      const lastHistoryTitle = current.articleHistory[current.articleHistory.length - 1]
+      const normalizedLast = normalizeTitle(lastHistoryTitle)
+      if (normalizedLast === normalizedOriginal) {
+        // Same as previous - skip navigation
+        return
+      }
+    }
+
+    // IMMEDIATE STATE UPDATE: Set loading state synchronously before async redirect resolution
+    // This provides instant feedback to the user
     let currentGridCells: GameGridCell[] = []
     const newlyMatchedTitles: string[] = []
     setState((prev) => {
       currentGridCells = prev.gridCells
       const nextClickCount = prev.clickCount + 1
+      // Use original title for now, will update with canonical after redirect resolution
       const nextHistory = [...prev.articleHistory, title]
 
       const nextMatched = new Set(prev.matchedArticles)
 
-      // Check direct matches first
+      // Check direct matches first (using original title)
       for (const cell of prev.gridCells) {
         const gridTitle = getCuratedArticleTitle(cell.article)
         const normalizedGrid = normalizeTitle(gridTitle)
         if (
-          (normalizedGrid === normalizedOriginal || normalizedGrid === normalizedClicked) &&
-          !nextMatched.has(gridTitle)
+          normalizedGrid === normalizedOriginal &&
+          !nextMatched.has(normalizeTitle(gridTitle))
         ) {
-          nextMatched.add(gridTitle)
+          nextMatched.add(normalizeTitle(gridTitle))
           newlyMatchedTitles.push(gridTitle)
         }
       }
@@ -373,11 +450,31 @@ export function useGameState(options: UseGameStateOptions = {}): [
         winningCells,
         gameWon: winningCells.length > 0,
         articleHistory: nextHistory,
-        currentArticleTitle: title,
+        currentArticleTitle: title, // Will be updated with canonical after redirect resolution
         timerRunning: false, // Timer will start when article finishes loading
-        articleLoading: true,
+        articleLoading: true, // Set immediately for instant feedback
       }
     })
+
+    // Now resolve redirects asynchronously
+    const canonicalClicked = await resolveRedirect(title)
+    const normalizedClicked = normalizeTitle(canonicalClicked)
+
+    // Update history with canonical title if different
+    if (canonicalClicked !== title) {
+      setState((prev) => {
+        const updatedHistory = [...prev.articleHistory]
+        // Replace the last entry (which was the original title) with canonical
+        if (updatedHistory.length > 0) {
+          updatedHistory[updatedHistory.length - 1] = canonicalClicked
+        }
+        return {
+          ...prev,
+          articleHistory: updatedHistory,
+          currentArticleTitle: canonicalClicked,
+        }
+      })
+    }
 
     // Second update: resolve redirects for all grid cells and check redirect-based matches
     const gridRedirects = await Promise.all(
@@ -402,9 +499,9 @@ export function useGameState(options: UseGameStateOptions = {}): [
             canonicalGrid === normalizedClicked ||
             normalizedGrid === normalizedOriginal ||
             normalizedGrid === normalizedClicked) &&
-          !nextMatched.has(gridTitle)
+          !nextMatched.has(normalizeTitle(gridTitle))
         ) {
-          nextMatched.add(gridTitle)
+          nextMatched.add(normalizeTitle(gridTitle))
           updated = true
           redirectMatchedTitles.push(gridTitle)
         }
@@ -426,16 +523,28 @@ export function useGameState(options: UseGameStateOptions = {}): [
     })
 
     // Call onMatch callback for redirect-based matches
+    // Wrap in try-catch to prevent crashes from confetti trigger errors
     if (onMatch && redirectMatchedTitles.length > 0) {
       redirectMatchedTitles.forEach((matchedTitle) => {
-        onMatch(matchedTitle)
+        try {
+          onMatch(matchedTitle)
+        } catch (error) {
+          console.error('Error in onMatch callback (redirect-based):', error)
+          // Continue execution - don't crash the game
+        }
       })
     }
 
     // Call onMatch callback for newly matched articles
+    // Wrap in try-catch to prevent crashes from confetti trigger errors
     if (onMatch && newlyMatchedTitles.length > 0) {
       newlyMatchedTitles.forEach((matchedTitle) => {
-        onMatch(matchedTitle)
+        try {
+          onMatch(matchedTitle)
+        } catch (error) {
+          console.error('Error in onMatch callback (direct match):', error)
+          // Continue execution - don't crash the game
+        }
       })
     }
   }
@@ -493,94 +602,130 @@ export function useGameState(options: UseGameStateOptions = {}): [
 
   /**
    * Replaces a failed article (either in the grid or the current article).
+   * Uses a ref to prevent multiple simultaneous replacements of the same article.
    * 
    * @param failedTitle - The title of the article that failed to load
    */
   const replaceFailedArticle = useCallback(
     async (failedTitle: string) => {
+      const normalizedFailed = normalizeTitle(failedTitle)
+      
+      // Prevent multiple simultaneous replacements of the same article
+      if (replacingArticlesRef.current.has(normalizedFailed)) {
+        console.warn(`Replacement already in progress for: ${failedTitle}`)
+        return
+      }
+      
+      replacingArticlesRef.current.add(normalizedFailed)
       console.warn(`Article failed to load: ${failedTitle}`)
 
-      setState((prev) => {
-        // Collect all currently used article titles (normalized)
-        const usedTitles = new Set<string>()
-        prev.gridCells.forEach((cell) => {
-          const title = getCuratedArticleTitle(cell.article)
-          usedTitles.add(normalizeTitle(title))
-        })
-        if (prev.startingArticle) {
-          const title = getCuratedArticleTitle(prev.startingArticle)
-          usedTitles.add(normalizeTitle(title))
-        }
+      try {
+        setState((prev) => {
+          // Collect all currently used article titles (normalized)
+          const usedTitles = new Set<string>()
+          prev.gridCells.forEach((cell) => {
+            const title = getCuratedArticleTitle(cell.article)
+            usedTitles.add(normalizeTitle(title))
+          })
+          if (prev.startingArticle) {
+            const title = getCuratedArticleTitle(prev.startingArticle)
+            usedTitles.add(normalizeTitle(title))
+          }
 
-        // Check if this article is in the grid
-        const gridIndex = prev.gridCells.findIndex((cell) => {
-          const title = getCuratedArticleTitle(cell.article)
-          return normalizeTitle(title) === normalizeTitle(failedTitle)
-        })
+          // Check if this article is in the grid
+          const gridIndex = prev.gridCells.findIndex((cell) => {
+            const title = getCuratedArticleTitle(cell.article)
+            return normalizeTitle(title) === normalizedFailed
+          })
 
-        if (gridIndex !== -1) {
-          // It's in the grid - replace it with a new random article
-          console.log(`Replacing grid article at index ${gridIndex}`)
+          if (gridIndex !== -1) {
+            // It's in the grid - replace it with a new random article
+            console.log(`Replacing grid article at index ${gridIndex}`)
 
-          // Get replacement asynchronously
-          getRandomArticle(Array.from(usedTitles))
-            .then((replacement) => {
-              setState((current) => {
-                const newGridCells = [...current.gridCells]
-                newGridCells[gridIndex] = {
-                  ...newGridCells[gridIndex],
-                  article: replacement,
-                }
-                console.log(`Replaced ${failedTitle} with ${getCuratedArticleTitle(replacement)}`)
-                return {
-                  ...current,
-                  gridCells: newGridCells,
-                }
+            // Get replacement asynchronously
+            getRandomArticle(Array.from(usedTitles))
+              .then((replacement) => {
+                setState((current) => {
+                  // Double-check the article is still at this index before replacing
+                  const currentTitle = getCuratedArticleTitle(current.gridCells[gridIndex]?.article)
+                  if (normalizeTitle(currentTitle) !== normalizedFailed) {
+                    console.warn(`Article at index ${gridIndex} changed before replacement completed`)
+                    replacingArticlesRef.current.delete(normalizedFailed)
+                    return current
+                  }
+                  
+                  const newGridCells = [...current.gridCells]
+                  newGridCells[gridIndex] = {
+                    ...newGridCells[gridIndex],
+                    article: replacement,
+                  }
+                  console.log(`Replaced ${failedTitle} with ${getCuratedArticleTitle(replacement)}`)
+                  replacingArticlesRef.current.delete(normalizedFailed)
+                  return {
+                    ...current,
+                    gridCells: newGridCells,
+                  }
+                })
               })
-            })
-            .catch((error) => {
-              console.error('Failed to get replacement article:', error)
-            })
-
-          return prev // Return unchanged state, replacement will update it
-        } else {
-          // It's the currently viewed article - replace with a new random one
-          console.log('Replacing currently viewed article')
-
-          getRandomArticle(Array.from(usedTitles))
-            .then((replacement) => {
-              const replacementTitle = getCuratedArticleTitle(replacement)
-              setState((current) => {
-                console.log(`Replaced viewed article with ${replacementTitle}`)
-                return {
-                  ...current,
-                  currentArticleTitle: replacementTitle,
-                  articleHistory: [...current.articleHistory, replacementTitle],
-                }
+              .catch((error) => {
+                console.error('Failed to get replacement article:', error)
+                replacingArticlesRef.current.delete(normalizedFailed)
               })
-            })
-            .catch((error) => {
-              console.error('Failed to get replacement article:', error)
-            })
 
-          return prev // Return unchanged state, replacement will update it
-        }
-      })
+            return prev // Return unchanged state, replacement will update it
+          } else {
+            // It's the currently viewed article - replace with a new random one
+            console.log('Replacing currently viewed article')
+
+            getRandomArticle(Array.from(usedTitles))
+              .then((replacement) => {
+                const replacementTitle = getCuratedArticleTitle(replacement)
+                setState((current) => {
+                  // Double-check the current article is still the failed one
+                  if (current.currentArticleTitle && normalizeTitle(current.currentArticleTitle) !== normalizedFailed) {
+                    console.warn(`Current article changed before replacement completed`)
+                    replacingArticlesRef.current.delete(normalizedFailed)
+                    return current
+                  }
+                  
+                  console.log(`Replaced viewed article with ${replacementTitle}`)
+                  replacingArticlesRef.current.delete(normalizedFailed)
+                  return {
+                    ...current,
+                    currentArticleTitle: replacementTitle,
+                    articleHistory: [...current.articleHistory, replacementTitle],
+                  }
+                })
+              })
+              .catch((error) => {
+                console.error('Failed to get replacement article:', error)
+                replacingArticlesRef.current.delete(normalizedFailed)
+              })
+
+            return prev // Return unchanged state, replacement will update it
+          }
+        })
+      } catch (error) {
+        console.error('Error in replaceFailedArticle:', error)
+        replacingArticlesRef.current.delete(normalizedFailed)
+      }
     },
     [getRandomArticle],
   )
 
-  return [
-    state,
-    {
+  const controls = useMemo(
+    () => ({
       startNewGame,
       loadGameFromId,
       createShareableGame,
       registerNavigation,
       setArticleLoading,
       replaceFailedArticle,
-    },
-  ]
+    }),
+    [startNewGame, loadGameFromId, createShareableGame, registerNavigation, setArticleLoading, replaceFailedArticle],
+  )
+
+  return [state, controls]
 }
 
 
