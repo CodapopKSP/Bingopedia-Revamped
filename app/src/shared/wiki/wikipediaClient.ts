@@ -4,6 +4,7 @@ import { retry } from '../utils/retry'
 interface WikipediaHtmlResult {
   title: string
   html: string
+  rawHtml?: string // Raw HTML before sanitization (for ToC extraction)
 }
 
 import { MAX_ARTICLE_CACHE_SIZE } from '../constants'
@@ -149,7 +150,12 @@ async function fetchSummaryHtml(title: string): Promise<string | null> {
 export async function fetchWikipediaArticle(title: string): Promise<WikipediaHtmlResult> {
   const key = normalizeTitle(title)
   const cached = ARTICLE_CACHE.get(key)
-  if (cached) return cached
+  // Return cached result, but ensure it has rawHtml if it's an old cached entry
+  if (cached) {
+    // If cached entry doesn't have rawHtml, we can't extract ToC from it
+    // But we'll still return it - ToC extraction will fall back to sanitized HTML
+    return cached
+  }
 
   // Try desktop HTML first (most complete content, matches old codebase preference)
   // Then fall back to mobile HTML, then summary
@@ -165,6 +171,7 @@ export async function fetchWikipediaArticle(title: string): Promise<WikipediaHtm
   const result: WikipediaHtmlResult = {
     title,
     html: sanitized,
+    rawHtml, // Store raw HTML for ToC extraction
   }
 
   // Enforce cache size limit before adding new entry

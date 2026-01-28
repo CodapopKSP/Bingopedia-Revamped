@@ -404,3 +404,235 @@ const handleClick = useCallback(
 ---
 
 ## Frontend Skills - Retry Patterns and Error Recovery
+
+---
+
+## Mobile Header Optimization Patterns
+
+### 15. Mobile Button Icon-Only Pattern
+**Context**: Optimizing article viewer header for mobile by converting text buttons to icon-only (Sprint 4, Task 3)
+
+**Technique**:
+- Use CSS media queries to hide text labels on mobile while keeping icons visible
+- Maintain accessibility with `aria-label` attributes (always present, not hidden)
+- Ensure touch targets meet minimum 44x44px requirement
+- Reduce padding and font sizes on mobile for space efficiency
+- Keep full text visible on desktop for clarity
+
+**Code Pattern**:
+```css
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .bp-toc-toggle-button {
+    padding: 0.375rem 0.75rem; /* Reduced from 0.5rem 1rem */
+    min-width: 44px; /* Touch target minimum */
+    min-height: 44px;
+  }
+  
+  /* Hide text on mobile, show icon only */
+  .bp-toc-toggle-button span {
+    display: none;
+  }
+  
+  /* Ensure icon is visible */
+  .bp-toc-toggle-button svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+  }
+}
+```
+
+**JSX Pattern**:
+```tsx
+<button
+  className="bp-toc-toggle-button"
+  aria-label="Open Table of Contents" // Always present for accessibility
+  title="Table of Contents"
+>
+  <svg>...</svg>
+  <span>Table of Contents</span> {/* Hidden on mobile via CSS */}
+</button>
+```
+
+**Application**: `app/src/features/article-viewer/ArticleViewer.css`, `ArticleViewer.tsx`
+
+**Key Insight**: Icon-only buttons save space on mobile while maintaining accessibility through ARIA labels. Always ensure touch targets meet accessibility guidelines (44x44px minimum). Text can be hidden with CSS while remaining accessible to screen readers.
+
+---
+
+### 16. Mobile Header Layout Optimization Pattern
+**Context**: Reducing header padding and gaps for mobile efficiency (Sprint 4, Task 3)
+
+**Technique**:
+- Reduce header padding on mobile: `padding: 0.75rem 1rem` (from `1rem 1.5rem`)
+- Reduce gap between elements: `gap: 0.5rem` (from `1rem`)
+- Optimize font sizes: `font-size: 1.1rem` (from `1.25rem` for titles)
+- Add hyphenation for better word breaking: `hyphens: auto`
+- Ensure title gets maximum available space with `flex: 1`
+
+**Code Pattern**:
+```css
+.bp-article-header {
+  padding: 1rem 1.5rem;
+  gap: 1rem;
+}
+
+.bp-article-title {
+  font-size: 1.25rem;
+  word-break: break-word;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .bp-article-header {
+    padding: 0.75rem 1rem; /* Reduced padding */
+    gap: 0.5rem; /* Reduced gap */
+  }
+  
+  .bp-article-title {
+    font-size: 1.1rem; /* Smaller font */
+    hyphens: auto; /* Better word breaking */
+  }
+}
+```
+
+**Application**: `app/src/features/article-viewer/ArticleViewer.css`
+
+**Key Insight**: Mobile screens require tighter spacing and smaller fonts. Use `hyphens: auto` for better word breaking in titles. Reduce padding and gaps proportionally to maximize content space while maintaining readability.
+
+---
+
+### 17. Mobile Button Sizing and Touch Target Pattern
+**Context**: Ensuring buttons remain tappable while reducing size on mobile (Sprint 4, Task 3)
+
+**Technique**:
+- Reduce padding: `padding: 0.375rem 0.75rem` (from `0.5rem 1rem`)
+- Reduce font size: `font-size: 0.8rem` (from `0.875rem`)
+- Enforce minimum touch target: `min-width: 44px`, `min-height: 44px`
+- Apply to all interactive buttons consistently
+
+**Code Pattern**:
+```css
+.bp-view-wikipedia-button {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .bp-view-wikipedia-button {
+    padding: 0.375rem 0.75rem; /* Reduced padding */
+    font-size: 0.8rem; /* Smaller font */
+    min-height: 44px; /* Touch target minimum */
+  }
+}
+```
+
+**Application**: `app/src/features/article-viewer/ArticleViewer.css`
+
+**Key Insight**: Mobile buttons can be smaller but must meet accessibility touch target requirements (44x44px minimum). Reduce padding and font size proportionally while maintaining minimum dimensions for usability.
+
+---
+
+## Modal Sizing and Tab Visibility Patterns
+
+### 18. Percentage-Based Modal Size Increase Pattern
+**Context**: Increasing modal height by percentage for better visibility (Sprint 4, Task 1)
+
+**Technique**:
+- Calculate percentage increase: 15% increase = multiply base by 1.15
+- Use `min()` function to cap maximum size: `max-height: min(97vh, 900px)`
+- Adjust related calculations proportionally: `max-height: calc(97vh - 280px)`
+- Add CSS comments explaining the calculation for maintainability
+- Ensure modal doesn't overflow viewport on smaller screens
+
+**Code Pattern**:
+```css
+.bp-game-details-content {
+  /* 15% increase: from 85vh to 97vh (capped at 900px for reasonable max) */
+  max-height: min(97vh, 900px);
+  /* 15% increase: from 600px to 690px */
+  min-height: 690px;
+}
+
+.bp-game-details-content-area {
+  /* Adjusted for new modal height: from calc(85vh - 280px) to calc(97vh - 280px) */
+  max-height: calc(97vh - 280px);
+}
+```
+
+**Application**: `app/src/features/leaderboard/GameDetailsModal.css`
+
+**Key Insight**: Percentage-based increases require updating all related calculations. Use `min()` to cap maximum sizes and prevent viewport overflow. Document calculations in CSS comments for future maintainers.
+
+---
+
+### 19. Responsive Board Size Increase Pattern
+**Context**: Increasing bingo board size proportionally on desktop only (Sprint 4, Task 1)
+
+**Technique**:
+- Calculate 15% increase: `90px * 1.15 = 103.5px` → round to `104px`
+- Apply increase to viewport-based calculations: `18vw → 21vw`, `18vh → 21vh`
+- Use media queries to apply only on desktop: `@media (min-width: 768px)`
+- Keep mobile sizing unchanged
+- Round values for cleaner CSS
+
+**Code Pattern**:
+```css
+/* Mobile: Keep existing size */
+.bp-game-details-board .bp-bingo-grid {
+  --cell-size: min(60px, 12vw, 12vh);
+}
+
+/* Desktop: 15% increase from 90px to 104px (rounded for cleaner values) */
+@media (min-width: 768px) {
+  .bp-game-details-board .bp-bingo-grid {
+    /* 15% increase: from min(90px, 18vw, 18vh) to min(104px, 21vw, 21vh) */
+    --cell-size: min(104px, 21vw, 21vh);
+  }
+}
+```
+
+**Application**: `app/src/features/leaderboard/GameDetailsModal.css`
+
+**Key Insight**: Responsive size increases should only apply where appropriate (desktop). Round calculated values for cleaner CSS. Use CSS custom properties (variables) for maintainability.
+
+---
+
+### 20. Tab Visibility Management with Enhanced Specificity Pattern
+**Context**: Fixing mobile tab visibility issues where inactive tabs were still visible (Sprint 4, Task 2)
+
+**Technique**:
+- Use combined class selectors for higher specificity: `.bp-game-details-board.bp-game-details-tab-active`
+- Add `!important` if needed to override conflicting styles
+- Use multiple CSS properties for extra safety: `display: none`, `visibility: hidden`, `opacity: 0`
+- Ensure both active and hidden states are explicitly defined
+- Apply to all tab content containers consistently
+
+**Code Pattern**:
+```css
+/* Ensure proper visibility toggling with sufficient specificity */
+.bp-game-details-board.bp-game-details-tab-active,
+.bp-game-details-history.bp-game-details-tab-active {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1;
+}
+
+.bp-game-details-board.bp-game-details-tab-hidden,
+.bp-game-details-history.bp-game-details-tab-hidden {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0;
+}
+```
+
+**Application**: `app/src/features/leaderboard/GameDetailsModal.css`
+
+**Key Insight**: Tab visibility issues often stem from insufficient CSS specificity or conflicting styles. Use combined class selectors and `!important` when necessary. Multiple CSS properties (`display`, `visibility`, `opacity`) provide defense in depth against visibility bugs.
+
+---
+
+**Date**: Sprint 4 - UI/UX Engineer Tasks  
+**Status**: Skills documented for future reference

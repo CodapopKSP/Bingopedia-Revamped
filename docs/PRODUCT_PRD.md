@@ -1,6 +1,6 @@
 ## Bingopedia PRD – Wikipedia Bingo Game (Rebuild)
 
-_Last updated: Sprint 1 – Gameplay Reliability & Core UX Polish_
+_Last updated: Sprint 4 – Table of Contents Fixes & Mobile UX Improvements_
 
 ### 1. Background & Purpose
 
@@ -138,15 +138,23 @@ Bingopedia is a web-based game that combines Wikipedia exploration with bingo me
 - Removes non-essential Wikipedia chrome (nav, sidebars, references, edit buttons, etc.).
 - All internal links remain clickable and drive game navigation.
 - External links either disabled or converted to non-interactive spans.
-- Elements that are determined to be **non-navigational** in the game context (e.g., disabled links or certain template-generated elements) should render with neutral text styling (no underline/“link” color) and default cursor, with **no strikethrough or “crossed out” treatment**.
+- **Images**: Images (including SVGs) within article content must not trigger article navigation when clicked. Images should be non-clickable or have click handlers that prevent navigation. Images must display with default cursor (not pointer/hand cursor) to indicate they are not clickable.
+- Elements that are determined to be **non-navigational** in the game context (e.g., disabled links or certain template-generated elements) should render with neutral text styling (no underline/"link" color) and default cursor, with **no strikethrough or "crossed out" treatment**.
 - **"View on Wikipedia" button**: 
   - Located at top right of article viewer.
   - Opens Wikipedia article in new tab/window.
   - **Confirmation modal required**: "Are you sure? Leaving may clear your game progress." with "Cancel" and "Continue" options.
+  - **Mobile optimization**: Button size should be reduced on mobile viewports to maximize space for article title.
+- **Article title display**:
+  - Article titles in the viewer header must be properly handled on mobile viewports.
+  - Long titles should wrap or truncate appropriately without overflow.
+  - Header layout should optimize space for title while keeping ToC and View on Wiki buttons accessible.
 - **Table of Contents**:
   - Displays Wikipedia-style table of contents extracted from article HTML.
-  - Located in a sidebar or collapsible section within the article viewer on larger screens; on smaller viewports or when space is constrained, it may be accessed via a dedicated “Table of Contents” control (button or icon) that opens a modal or overlay.
+  - Located in a sidebar or collapsible section within the article viewer on larger screens; on smaller viewports or when space is constrained, it may be accessed via a dedicated "Table of Contents" control (button or icon) that opens a modal or overlay.
+  - **Mobile optimization**: On mobile viewports, ToC control should be a hamburger menu icon (☰) to save horizontal space.
   - Clickable items jump to corresponding sections with smooth scrolling.
+  - Must reliably load and display correct section headers from article HTML.
   - Collapsible/expandable for space efficiency and closable when presented as a modal.
   - Styled to match Wikipedia's ToC appearance.
 - **Immediate click feedback**:
@@ -155,7 +163,7 @@ Bingopedia is a web-based game that combines Wikipedia exploration with bingo me
   - Links are disabled/visually distinct while article is loading (prevents double-clicks).
 - Visual indicators:
   - Loading state while fetching article content.
-  - While loading (and timer paused), display concise copy near the timer indicating that the timer is paused (e.g., “Timer paused while loading article”).
+  - While loading (and timer paused), display concise copy under "Loading article..." text indicating that the timer is paused (e.g., "Timer paused while loading article"). Do not display pause indicator next to the timer itself.
   - If an article fails to load, automatically retry up to 3 times before showing error.
   - After retries fail, show fallback messaging then auto-substitute a replacement behind the scenes.
 - **Theme styling**:
@@ -249,6 +257,12 @@ Bingopedia is a web-based game that combines Wikipedia exploration with bingo me
     - Summary stats (score, clicks, time, date).
     - **Replay button**: Allows user to start a new game with the same board and starting article.
     - Full article history for that run (even if long), potentially scrollable.
+  - **Modal sizing requirements**:
+    - Modal height must accommodate full 5×5 Bingo board visibility (all rows visible).
+    - Bingo board cells should be appropriately sized to fit within modal height.
+    - Modal width should be balanced (not excessively wide).
+    - Article History tab must maintain equal or larger size compared to Bingo Board tab.
+    - **Mobile tab visibility**: On mobile viewports, tab content (Bingo Board or Article History) should only display when its corresponding tab is actively selected. Tab content must not overlay or obscure other content when not selected.
 
 ---
 
@@ -345,6 +359,10 @@ Bingopedia is a web-based game that combines Wikipedia exploration with bingo me
   - Make ToC collapsible/expandable for space efficiency.
   - Ensure ToC works in both light and dark themes.
   - Ensure ToC works on mobile and desktop layouts.
+  - **Reliability requirement**: ToC must reliably load and display correct section headers from article HTML (no missing or incorrect data).
+  - **Scrolling requirement**: Clicking ToC items must smoothly scroll to the correct section within the article.
+  - **Performance requirement**: ToC must open instantly (<100ms) when accessed; no perceptible delay.
+  - **Display requirement**: ToC must correctly parse and display section titles (not truncated or corrupted text).
 
 - **FR10B – Immediate click feedback**
   - Provide immediate visual feedback (<50ms) when user clicks an article link.

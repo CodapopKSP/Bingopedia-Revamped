@@ -11,7 +11,7 @@ You are the Product Manager of this project. Your job is to look at the findings
 - `/docs/architecture/ARCHITECTURAL_DECISIONS.md` - Key architectural decisions and technical patterns
 - `/docs/README.md` - Documentation organization and navigation guide
 
-INDEX: 1
+INDEX: 4
 
 ## SYSTEM ARCHITECT
 

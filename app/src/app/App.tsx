@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { AppLayout } from './AppLayout'
 import { StartScreen } from '../features/game/StartScreen'
 import { GameScreen } from '../features/game/GameScreen'
@@ -20,14 +20,19 @@ export function App() {
   const [gameLoadError, setGameLoadError] = useState<string | null>(null)
   const onMatchRef = useRef<((title: string) => void) | undefined>(undefined)
 
-  const [state, controls] = useGameState({
-    onMatch: (title: string) => {
-      // Call the callback if it's been set
-      if (onMatchRef.current) {
-        onMatchRef.current(title)
-      }
-    },
-  })
+  // Memoize onMatch callback to prevent useGameState from recreating registerNavigation on every render
+  // This prevents ArticleViewer from re-rendering every second when timer ticks
+  const onMatch = useCallback((title: string) => {
+    // Call the callback if it's been set
+    if (onMatchRef.current) {
+      onMatchRef.current(title)
+    }
+  }, []) // Empty deps - uses ref for latest value
+
+  // Memoize options object to prevent useGameState from seeing it as a new object on every render
+  const gameStateOptions = useMemo(() => ({ onMatch }), [onMatch])
+
+  const [state, controls] = useGameState(gameStateOptions)
 
   // Check for game in URL on mount (path-based or query param for backward compatibility)
   useEffect(() => {

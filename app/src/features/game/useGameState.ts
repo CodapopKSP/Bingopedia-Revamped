@@ -201,6 +201,8 @@ export function useGameState(options: UseGameStateOptions = {}): [
   const elapsedSecondsRef = useRef<number>(0)
   // State ref for synchronous duplicate checking (avoids stale closure issues)
   const stateRef = useRef<GameState>(state)
+  // Navigation lock ref to prevent concurrent navigations (synchronous check, no state update delay)
+  const isNavigatingRef = useRef<boolean>(false)
 
   // Use the dedicated timer hook for cleaner separation of concerns
   // onTick callback has empty dependency array because setState updater function is stable
@@ -377,26 +379,39 @@ export function useGameState(options: UseGameStateOptions = {}): [
    * 
    * This is the single navigation pipeline entry point used by ArticleViewer.
    * It:
-   * 1. Immediately sets articleLoading to true (synchronous, before async work)
-   * 2. Records navigation in history and increments click count
-   * 3. Resolves redirects for both clicked and grid articles (async)
-   * 4. Performs bidirectional matching (clicked→grid and grid→clicked)
-   * 5. Updates matched articles and checks for winning conditions
-   * 6. Starts/pauses timer appropriately
+   * 1. Checks navigation lock (synchronous, prevents concurrent navigations)
+   * 2. Resolves redirects BEFORE fetching article content (prevents title switching)
+   * 3. Immediately sets articleLoading to true with resolved title
+   * 4. Records navigation in history and increments click count
+   * 5. Fetches article content using resolved title
+   * 6. Resolves redirects for grid articles (async)
+   * 7. Performs bidirectional matching (clicked→grid and grid→clicked)
+   * 8. Updates matched articles and checks for winning conditions
+   * 9. Starts/pauses timer appropriately
    * 
    * History clicks always count as clicks and can trigger matches/wins.
    * Duplicate navigation is prevented to avoid unnecessary state updates.
+   * Navigation lock prevents race conditions from rapid clicks.
+   * 
+   * Wrapped in useCallback to prevent recreation on every render (which causes ArticleViewer to re-render).
+   * Uses refs for state access, so empty dependency array is correct.
    * 
    * @param title - The article title to navigate to
    */
-  const registerNavigation = async (title: string) => {
-    const normalizedOriginal = normalizeTitle(title)
+  const registerNavigation = useCallback(async (title: string) => {
+    // Synchronous navigation lock check (no state update delay)
+    if (isNavigatingRef.current) {
+      console.log('Navigation already in progress, ignoring click')
+      return
+    }
     
     // DUPLICATE DETECTION: Check against current and previous article using state ref
     // This prevents duplicate navigation that would increment click count unnecessarily
+    // Do this BEFORE setting lock to avoid locking on duplicates
+    const normalizedOriginal = normalizeTitle(title)
     const current = stateRef.current
     
-    // Check if this is the same as current article (using original title before redirect resolution)
+    // Check if this is the same as current article
     if (current.currentArticleTitle) {
       const normalizedCurrent = normalizeTitle(current.currentArticleTitle)
       if (normalizedCurrent === normalizedOriginal) {
@@ -414,25 +429,47 @@ export function useGameState(options: UseGameStateOptions = {}): [
         return
       }
     }
+    
+    // Set lock immediately (before any async operations)
+    isNavigatingRef.current = true
+    
+    try {
+      // STEP 1: Resolve redirect FIRST (before fetching article)
+      // This prevents title switching during article display
+      let resolvedTitle: string
+      try {
+        resolvedTitle = await Promise.race([
+          resolveRedirect(title),
+          new Promise<string>((resolve) => 
+            setTimeout(() => resolve(title), 5000) // 5 second timeout
+          )
+        ])
+      } catch (error) {
+        // On error, fallback to original title
+        console.warn('Redirect resolution failed, using original title:', error)
+        resolvedTitle = title
+      }
+      
+      const normalizedResolved = normalizeTitle(resolvedTitle)
 
-    // IMMEDIATE STATE UPDATE: Set loading state synchronously before async redirect resolution
-    // This provides instant feedback to the user
+    // STEP 2: Set loading state with resolved title (after redirect resolution)
+    // This provides instant feedback and prevents title switching
     let currentGridCells: GameGridCell[] = []
     const newlyMatchedTitles: string[] = []
     setState((prev) => {
       currentGridCells = prev.gridCells
       const nextClickCount = prev.clickCount + 1
-      // Use original title for now, will update with canonical after redirect resolution
-      const nextHistory = [...prev.articleHistory, title]
+      // Use resolved title for history and current article
+      const nextHistory = [...prev.articleHistory, resolvedTitle]
 
       const nextMatched = new Set(prev.matchedArticles)
 
-      // Check direct matches first (using original title)
+      // Check direct matches first (using resolved title)
       for (const cell of prev.gridCells) {
         const gridTitle = getCuratedArticleTitle(cell.article)
         const normalizedGrid = normalizeTitle(gridTitle)
         if (
-          normalizedGrid === normalizedOriginal &&
+          (normalizedGrid === normalizedOriginal || normalizedGrid === normalizedResolved) &&
           !nextMatched.has(normalizeTitle(gridTitle))
         ) {
           nextMatched.add(normalizeTitle(gridTitle))
@@ -450,31 +487,15 @@ export function useGameState(options: UseGameStateOptions = {}): [
         winningCells,
         gameWon: winningCells.length > 0,
         articleHistory: nextHistory,
-        currentArticleTitle: title, // Will be updated with canonical after redirect resolution
+        currentArticleTitle: resolvedTitle, // Use resolved title immediately
         timerRunning: false, // Timer will start when article finishes loading
-        articleLoading: true, // Set immediately for instant feedback
+        articleLoading: true, // Set after redirect resolution
       }
     })
 
-    // Now resolve redirects asynchronously
-    const canonicalClicked = await resolveRedirect(title)
-    const normalizedClicked = normalizeTitle(canonicalClicked)
-
-    // Update history with canonical title if different
-    if (canonicalClicked !== title) {
-      setState((prev) => {
-        const updatedHistory = [...prev.articleHistory]
-        // Replace the last entry (which was the original title) with canonical
-        if (updatedHistory.length > 0) {
-          updatedHistory[updatedHistory.length - 1] = canonicalClicked
-        }
-        return {
-          ...prev,
-          articleHistory: updatedHistory,
-          currentArticleTitle: canonicalClicked,
-        }
-      })
-    }
+    // STEP 3: Article fetch will happen in ArticleViewer using resolvedTitle
+    // The resolved title is already set in state, so ArticleViewer will fetch the correct article
+    const normalizedClicked = normalizedResolved
 
     // Second update: resolve redirects for all grid cells and check redirect-based matches
     const gridRedirects = await Promise.all(
@@ -547,7 +568,11 @@ export function useGameState(options: UseGameStateOptions = {}): [
         }
       })
     }
-  }
+    } finally {
+      // Always clear navigation lock, even on error
+      isNavigatingRef.current = false
+    }
+  }, [onMatch]) // onMatch is the only external dependency; all state access uses refs
 
   const setArticleLoading = useCallback((loading: boolean) => {
     setState((prev) => {

@@ -709,3 +709,634 @@ retryTimeoutRef.current = window.setTimeout(() => {
 **Date**: User Feedback Sprint - Frontend Engineer Tasks (P2-2)  
 **Status**: Skills documented for future reference
 
+---
+
+### 5. Table of Contents Extraction Caching Pattern
+**Context**: Optimizing ToC extraction performance (Sprint 2 - S1.2)
+
+**Technique**:
+- Extract ToC synchronously during HTML processing (not in separate useEffect)
+- Cache extraction results per article title using `useRef<Map<string, ToCItem[]>>`
+- Check cache before extracting to avoid redundant DOM parsing
+- Cache key should be normalized article title for consistency
+
+**Code Pattern**:
+```typescript
+const tocCacheRef = useRef<Map<string, ToCItem[]>>(new Map())
+
+// During HTML processing (in loadArticle function)
+const normalizedTitle = normalizeTitle(articleTitle)
+let extractedToc: ToCItem[] = []
+
+const cachedToc = tocCacheRef.current.get(normalizedTitle)
+if (cachedToc) {
+  extractedToc = cachedToc
+} else {
+  extractedToc = extractTableOfContents(result.html)
+  tocCacheRef.current.set(normalizedTitle, extractedToc)
+}
+
+// Set both content and ToC in same render cycle
+setContent(processed)
+setTocItems(extractedToc)
+```
+
+**Application**: `app/src/features/article-viewer/ArticleViewer.tsx`
+
+**Key Insights**:
+- Extract during HTML processing eliminates delay from useEffect dependency chain
+- Caching prevents re-extraction when revisiting same article
+- Normalize cache keys to handle title variations (case, whitespace, etc.)
+- Cache persists for component lifetime (cleared on unmount)
+
+---
+
+### 6. Immediate Modal Opening Pattern
+**Context**: Improving ToC modal UX - opening instantly without waiting for extraction (Sprint 2 - S1.3)
+
+**Technique**:
+- Open modal immediately on button click (don't wait for data)
+- Show loading state inside modal if data not ready
+- Modal content updates automatically when data becomes available
+- Remove conditional rendering that blocks modal display
+
+**Code Pattern**:
+```typescript
+const handleTocToggle = () => {
+  setShowToc(!showToc)
+  // Modal opens immediately - if tocItems is empty, loading state will be shown
+}
+
+// In render:
+{showToc && (
+  <div className="bp-modal-overlay">
+    <div className="bp-modal-content">
+      {tocItems.length > 0 ? (
+        <TableOfContents items={tocItems} onNavigate={handleTocNavigate} />
+      ) : (
+        <div className="bp-article-loading">
+          <div className="bp-spinner"></div>
+          <p>Loading table of contents...</p>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+```
+
+**Application**: `app/src/features/article-viewer/ArticleViewer.tsx`
+
+**Key Insights**:
+- Opening modal immediately provides instant feedback (<50ms)
+- Loading state inside modal is better UX than blocking modal display
+- Modal updates reactively when data becomes available
+- Pattern works well for any async data that might be cached
+
+---
+
+### 7. Image Click Prevention Pattern
+**Context**: Preventing image clicks from triggering article navigation (Sprint 2 - S3.1)
+
+**Technique**:
+- Detect image clicks in event handler before link navigation logic
+- Check if click target is image element or inside image container
+- Prevent default and stop propagation for image clicks
+- Return early to skip navigation logic
+- Optionally mark images with CSS class during HTML processing
+
+**Code Pattern**:
+```typescript
+const handleClick = useCallback((e: MouseEvent) => {
+  if (gameWonRef.current || isNavigatingRef.current) return
+
+  const target = e.target as HTMLElement
+  
+  // Detect image clicks and prevent navigation
+  if (
+    target.tagName === 'IMG' ||
+    target.tagName === 'SVG' ||
+    target.closest('img') !== null ||
+    target.closest('svg') !== null ||
+    target.closest('picture') !== null
+  ) {
+    e.preventDefault()
+    e.stopPropagation()
+    return // Early return - skip navigation logic
+  }
+
+  // Continue with link navigation logic...
+  const link = target.closest('a')
+  // ...
+}, [])
+
+// During HTML processing (optional enhancement):
+links.forEach((link) => {
+  const images = link.querySelectorAll('img, svg, picture')
+  images.forEach((img) => {
+    img.classList.add('bp-image-non-navigational')
+  })
+})
+```
+
+**Application**: `app/src/features/article-viewer/ArticleViewer.tsx`
+
+**Key Insights**:
+- Check image elements before checking for links (order matters)
+- Use `closest()` to handle nested structures (image inside link)
+- Prevent both default and propagation to fully stop navigation
+- CSS class marking is optional but useful for future styling/debugging
+- Pattern preserves image accessibility (alt text, etc.) while preventing navigation
+
+---
+
+### 8. Robust Section Navigation Pattern
+**Context**: Implementing reliable ToC section scrolling with case-insensitive matching (Sprint 2 - S2.3)
+
+**Technique**:
+- Try multiple ID selector formats (exact, lowercase, uppercase)
+- Fallback to manual iteration with case-insensitive comparison
+- Use `scrollIntoView` with smooth behavior
+- Close modal after navigation for better UX
+
+**Code Pattern**:
+```typescript
+const handleTocNavigate = useCallback((sectionId: string) => {
+  if (contentRef.current) {
+    // Try exact match first
+    let element = contentRef.current.querySelector(`#${sectionId}`)
+    
+    // If not found, try case-insensitive matching
+    if (!element) {
+      element = contentRef.current.querySelector(`#${sectionId.toLowerCase()}`)
+    }
+    if (!element) {
+      element = contentRef.current.querySelector(`#${sectionId.toUpperCase()}`)
+    }
+    if (!element) {
+      // Fallback: manual iteration with case-insensitive comparison
+      const allElements = contentRef.current.querySelectorAll('[id]')
+      for (const el of Array.from(allElements)) {
+        if (el.id.toLowerCase() === sectionId.toLowerCase()) {
+          element = el
+          break
+        }
+      }
+    }
+    
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      setShowToc(false) // Close modal after navigation
+    }
+  }
+}, [])
+```
+
+**Application**: `app/src/features/article-viewer/ArticleViewer.tsx`
+
+**Key Insights**:
+- Wikipedia section IDs may have case variations
+- Multiple fallback strategies ensure navigation works reliably
+- Manual iteration is slower but handles edge cases
+- Smooth scrolling provides better UX than instant jump
+- Closing modal after navigation reduces UI clutter
+
+---
+
+### 9. Synchronous HTML Processing Pattern
+**Context**: Moving ToC extraction to HTML processing phase for better performance (Sprint 2 - S1.1)
+
+**Technique**:
+- Perform data extraction immediately when HTML is received
+- Extract before or during HTML sanitization/processing
+- Set multiple state values in same render cycle
+- Remove separate useEffect that watches for content changes
+
+**Code Pattern**:
+```typescript
+// ❌ Old approach (separate useEffect)
+useEffect(() => {
+  if (content && !loading) {
+    const extracted = extractTableOfContents(content)
+    setTocItems(extracted)
+  }
+}, [content, loading])
+
+// ✅ New approach (synchronous during processing)
+const result = await fetchWikipediaArticle(articleTitle)
+const processed = processHtmlLinks(result.html)
+
+// Extract ToC immediately (before setting content)
+const extractedToc = extractTableOfContents(result.html)
+
+// Set both in same render cycle
+setContent(processed)
+setTocItems(extractedToc)
+```
+
+**Application**: `app/src/features/article-viewer/ArticleViewer.tsx`
+
+**Key Insights**:
+- Synchronous extraction eliminates delay from useEffect dependency chain
+- Data is available immediately when content is set
+- No race conditions between content and ToC state
+- Better performance: one render cycle instead of two
+- Pattern applies to any data extraction from HTML/DOM
+
+---
+
+**Date**: Sprint 2 - Frontend Engineer Tasks  
+**Status**: Skills documented for future reference
+
+---
+
+### 11. Immediate preventDefault() Pattern for Link Clicks
+**Context**: Fixing double-click navigation bug where browser navigated to external URLs (Sprint 3 - Critical Bug Fix)
+
+**Problem**:
+- Double-clicking links caused browser navigation to `localhost/linkname`
+- `preventDefault()` was called too late (after validation checks)
+- Browser processed navigation before handler could prevent it
+
+**Technique**:
+- Call `preventDefault()` IMMEDIATELY when link is detected, before any conditional checks
+- Use capture phase event listeners to catch clicks earlier in the event flow
+- Prevent default for ALL link clicks, then validate if navigation should proceed
+
+**Code Pattern**:
+```typescript
+const handleClick = useCallback((e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  const link = target.closest('a')
+  
+  // CRITICAL: Prevent default navigation IMMEDIATELY for any link click
+  // This must happen before any conditional checks to prevent browser navigation
+  if (link) {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  // Now do validation checks (debounce, game state, etc.)
+  if (gameWonRef.current || isNavigatingRef.current) {
+    return // preventDefault already called above
+  }
+
+  // Continue with navigation logic...
+}, [])
+
+// Use capture phase to catch clicks earlier
+useEffect(() => {
+  if (!contentRef.current || !content) return
+  const container = contentRef.current
+  container.addEventListener('click', handleClick, true) // true = capture phase
+  return () => {
+    container.removeEventListener('click', handleClick, true)
+  }
+}, [content, handleClick])
+```
+
+**Key Insights**:
+- `preventDefault()` must be called synchronously before any async operations or validation
+- Capture phase (`true` parameter) ensures handler runs before event reaches link element
+- Preventing default for all links is safe - you can still handle navigation programmatically
+- Double-clicks can trigger browser navigation if preventDefault isn't called immediately
+
+**Application**: `app/src/features/article-viewer/ArticleViewer.tsx`
+
+**Best Practices**:
+- Always call `preventDefault()` immediately when detecting link clicks
+- Use capture phase (`true`) for event listeners that need to intercept events early
+- Don't rely on validation checks before preventing default - prevent first, validate second
+- Test double-click scenarios - browsers can process navigation very quickly
+
+**Prevention Checklist**:
+- [ ] `preventDefault()` called before any async operations
+- [ ] `preventDefault()` called before any conditional checks
+- [ ] Event listener uses capture phase if early interception needed
+- [ ] Double-click scenarios tested
+- [ ] Browser navigation completely prevented for all link clicks
+
+**Date**: Sprint 3 - Critical Bug Fix  
+**Status**: Skills documented for future reference
+
+---
+
+### 10. Navigation Race Condition Prevention Pattern
+**Context**: Fixing navigation race conditions from rapid clicks (Sprint 3 - S1)
+
+**Technique**:
+- Use ref-based navigation lock in state management hook (synchronous check, no state update delay)
+- Implement click debouncing in component click handler (synchronous timestamp check)
+- Set lock immediately before async operations
+- Always clear lock in finally block (even on errors)
+- Provide visual feedback even for debounced clicks
+
+**Code Pattern**:
+```typescript
+// In useGameState.ts - Navigation lock
+const isNavigatingRef = useRef<boolean>(false)
+
+const registerNavigation = async (title: string) => {
+  // Synchronous check using ref (no state update delay)
+  if (isNavigatingRef.current) {
+    console.log('Navigation already in progress, ignoring click')
+    return
+  }
+  
+  // Set lock immediately (before any async operations)
+  isNavigatingRef.current = true
+  
+  try {
+    // ... navigation logic ...
+  } finally {
+    // Always clear lock, even on error
+    isNavigatingRef.current = false
+  }
+}
+
+// In ArticleViewer.tsx - Click debouncing
+const lastClickTimeRef = useRef<number>(0)
+const DEBOUNCE_DELAY = 100 // milliseconds
+
+const handleClick = useCallback((e: MouseEvent) => {
+  // Debounce check: ignore clicks within DEBOUNCE_DELAY of previous click
+  const now = Date.now()
+  if (now - lastClickTimeRef.current < DEBOUNCE_DELAY) {
+    e.preventDefault()
+    e.stopPropagation()
+    // Still provide visual feedback even if debounced
+    const link = target.closest('a')
+    if (link) {
+      link.classList.add('bp-link-clicked')
+      setTimeout(() => link.classList.remove('bp-link-clicked'), 200)
+    }
+    return
+  }
+  lastClickTimeRef.current = now
+  
+  // ... rest of click handling ...
+}, [])
+```
+
+**Application**: `app/src/features/game/useGameState.ts`, `app/src/features/article-viewer/ArticleViewer.tsx`
+
+**Key Insights**:
+- Use refs for synchronous checks (no state update delay)
+- Lock must be set before any async operations
+- Always clear lock in finally block to prevent deadlocks
+- Debounce at component level complements navigation lock at state level
+- Visual feedback should work even for debounced clicks (better UX)
+- 100ms debounce delay balances responsiveness and race condition prevention
+
+---
+
+### 11. Pre-Display Redirect Resolution Pattern
+**Context**: Fixing redirect resolution timing to prevent title switching (Sprint 3 - S3)
+
+**Technique**:
+- Resolve redirects BEFORE fetching article content
+- Use Promise.race with timeout to prevent indefinite hangs
+- Set resolved title in state immediately after resolution
+- Use resolved title for all subsequent operations (duplicate check, article fetch)
+- Fallback to original title on error or timeout
+
+**Code Pattern**:
+```typescript
+const registerNavigation = async (title: string) => {
+  // STEP 1: Resolve redirect FIRST (before fetching article)
+  let resolvedTitle: string
+  try {
+    resolvedTitle = await Promise.race([
+      resolveRedirect(title),
+      new Promise<string>((resolve) => 
+        setTimeout(() => resolve(title), 5000) // 5 second timeout
+      )
+    ])
+  } catch (error) {
+    // On error, fallback to original title
+    console.warn('Redirect resolution failed, using original title:', error)
+    resolvedTitle = title
+  }
+  
+  // STEP 2: Use resolved title for all operations
+  const normalizedResolved = normalizeTitle(resolvedTitle)
+  
+  // STEP 3: Set state with resolved title immediately
+  setState((prev) => ({
+    ...prev,
+    currentArticleTitle: resolvedTitle, // Use resolved title immediately
+    articleLoading: true, // Set after redirect resolution
+    // ... rest of state updates
+  }))
+  
+  // STEP 4: Article fetch will use resolved title (from state)
+  // ArticleViewer watches currentArticleTitle and fetches using resolved title
+}
+```
+
+**Application**: `app/src/features/game/useGameState.ts`
+
+**Key Insights**:
+- Resolving before fetch prevents title switching during article display
+- Promise.race with timeout prevents indefinite hangs (5 seconds is reasonable)
+- Fallback to original title ensures navigation never blocks
+- Resolved title used immediately in state (no intermediate title display)
+- ArticleViewer automatically fetches using resolved title from state
+- Error handling ensures graceful degradation (never breaks navigation)
+
+---
+
+### 20. Table of Contents Extraction Patterns
+**Context**: Enhancing ToC extraction robustness for Wikipedia articles (Sprint 4)
+
+**Technique**:
+- Multiple fallback extraction strategies for handling Wikipedia HTML structure variations
+- Robust ID normalization and URL decoding for consistent section matching
+- Expanded selector matching with validation
+- Error recovery with graceful degradation
+
+**Code Pattern**:
+```typescript
+/**
+ * Extracts table of contents with multiple fallback strategies.
+ * Strategy 1: Primary extraction from raw HTML
+ * Strategy 2: Fallback - try alternative container locations
+ */
+export function extractTableOfContents(html: string, articleTitle?: string): ToCItem[] {
+  // Strategy 1: Primary extraction
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, 'text/html')
+  
+  // Expanded selector list for better compatibility
+  const tocContainer = 
+    doc.getElementById('toc') || 
+    doc.querySelector('nav#toc') ||
+    doc.querySelector('div.toc') ||
+    doc.querySelector('aside.toc') ||
+    doc.querySelector('[id="toc"]') ||
+    doc.querySelector('.toc') ||
+    doc.querySelector('nav.toc') ||
+    doc.querySelector('[role="navigation"]')
+  
+  // Validate container has at least one <ul> before proceeding
+  if (tocContainer) {
+    const mainList = tocContainer.querySelector('ul')
+    if (mainList && mainList instanceof HTMLUListElement) {
+      const items = extractItems(mainList)
+      if (items.length > 0) return items
+    }
+  }
+  
+  // Strategy 2: Fallback - try alternative locations
+  const alternativeContainers = doc.querySelectorAll('nav, aside, div[class*="toc"]')
+  for (const container of Array.from(alternativeContainers)) {
+    const mainList = container.querySelector('ul')
+    if (mainList && mainList instanceof HTMLUListElement) {
+      const hasSectionLinks = mainList.querySelectorAll('a[href^="#"]').length > 0
+      if (hasSectionLinks) {
+        const items = extractItems(mainList)
+        if (items.length > 0) return items
+      }
+    }
+  }
+  
+  // Log warning in development mode
+  if (process.env.NODE_ENV === 'development') {
+    const titleInfo = articleTitle ? ` for article "${articleTitle}"` : ''
+    console.warn(`Table of Contents container not found${titleInfo}`)
+  }
+  
+  return []
+}
+
+/**
+ * Normalizes section IDs for consistent matching.
+ * Handles URL encoding, normalizes separators, converts to lowercase.
+ */
+function normalizeSectionId(id: string): string {
+  // Decode URL encoding (e.g., %20 → space, %27 → apostrophe)
+  let normalized = decodeURIComponent(id)
+  
+  // Normalize separators: convert underscores and spaces to hyphens
+  normalized = normalized.replace(/[_\s]+/g, '-')
+  
+  // Convert to lowercase for consistent matching
+  normalized = normalized.toLowerCase()
+  
+  // Remove leading/trailing hyphens
+  normalized = normalized.replace(/^-+|-+$/g, '')
+  
+  return normalized
+}
+
+/**
+ * Extracts section ID from link element.
+ * Tries href attribute first, then id attribute as fallback.
+ */
+function extractSectionId(link: HTMLAnchorElement): string {
+  // Primary: Extract from href attribute
+  const href = link.getAttribute('href')
+  if (href) {
+    const idFromHref = href.replace(/^#/, '')
+    if (idFromHref) {
+      return normalizeSectionId(idFromHref)
+    }
+  }
+  
+  // Fallback: Extract from id attribute
+  const idAttr = link.getAttribute('id')
+  if (idAttr) {
+    return normalizeSectionId(idAttr)
+  }
+  
+  return ''
+}
+
+/**
+ * Cleans text content by removing icon spans and navigation elements.
+ */
+function extractCleanText(link: HTMLAnchorElement): string {
+  const clone = link.cloneNode(true) as HTMLAnchorElement
+  
+  // Remove icon spans and navigation elements
+  const icons = clone.querySelectorAll('span.mw-editsection, .mw-editsection, .icon, [class*="icon"]')
+  icons.forEach(icon => icon.remove())
+  
+  // Extract text content (handles nested structures, preserves Unicode)
+  const text = clone.textContent?.trim() || clone.innerText?.trim() || ''
+  
+  return text
+}
+```
+
+**Application**: `app/src/features/article-viewer/ArticleViewer.tsx`
+
+**Key Insights**:
+- Multiple fallback strategies handle Wikipedia HTML structure variations (desktop vs. mobile)
+- ID normalization ensures consistent matching between ToC items and section headings
+- URL decoding handles encoded characters in section IDs (`%20` → space, `%27` → apostrophe)
+- Text cleaning removes icon spans and navigation elements for clean display
+- Validation checks (container has `<ul>`, has section links) prevent false positives
+- Development logging helps debug extraction failures with article context
+- Graceful degradation: returns empty array if all strategies fail (component handles empty state)
+
+**Use Cases**:
+- Extracting ToC from Wikipedia articles with varying HTML structures
+- Handling URL-encoded section IDs in ToC links
+- Normalizing IDs for consistent scrolling behavior
+- Cleaning text content from nested HTML structures
+
+---
+
+### 21. Image Cursor Override Patterns
+**Context**: Fixing cursor styling for images in article viewer (Sprint 4)
+
+**Technique**:
+- Overriding link cursor styles for nested image elements
+- Using `!important` for CSS specificity when needed
+- Targeting multiple image element types (img, svg, picture)
+- Ensuring cursor consistency across all image contexts
+
+**Code Pattern**:
+```css
+/* Image cursor styling - override link cursor styles */
+/* Images should display with default cursor since they are not clickable */
+.bp-article-body img,
+.bp-article-body svg,
+.bp-article-body picture {
+  cursor: default !important;
+}
+
+/* Also target images inside links to override link cursor */
+.bp-article-body a img,
+.bp-article-body a svg {
+  cursor: default !important;
+}
+```
+
+**Application**: `app/src/features/article-viewer/ArticleViewer.css`
+
+**Key Insights**:
+- Images wrapped in `<a>` tags inherit pointer cursor from parent link
+- `!important` is necessary to override link cursor styles (higher specificity)
+- Target all image element types (img, svg, picture) for consistency
+- Also target images inside links explicitly to ensure override works
+- Default cursor indicates images are not clickable (matches existing behavior)
+- Works in both light and dark themes (uses CSS custom properties)
+
+**Use Cases**:
+- Overriding inherited cursor styles from parent elements
+- Ensuring consistent cursor behavior for non-clickable images
+- Fixing cursor display when images are nested in clickable containers
+- Maintaining visual consistency across different image types
+
+**CSS Specificity Notes**:
+- Link styles typically have higher specificity than image styles
+- `!important` ensures image cursor rules take precedence
+- Multiple selectors (direct and nested) ensure all cases are covered
+- Specificity order: `a img` > `img` (both use `!important` for safety)
+
+---
+
+**Date**: Sprint 4 - Frontend Engineer Tasks  
+**Status**: Skills documented for future reference
+

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { GameState } from './types'
 import { BingoGrid } from './BingoGrid'
 import { HistoryPanel } from './HistoryPanel'
@@ -84,6 +84,12 @@ export function GameScreen({ state, controls, onBackToStart, onMatchCallbackRead
     await replaceFailedArticle(title)
   }, [replaceFailedArticle])
 
+  // Memoize isPausedForLoading to prevent recalculation on every render
+  // This prevents ArticleViewer from re-rendering every second when timer ticks
+  const isPausedForLoading = useMemo(() => {
+    return !state.timerRunning && articleLoading
+  }, [state.timerRunning, articleLoading])
+
   return (
     <div className="bp-game-screen">
       {showWinConfetti && <Confetti play={showWinConfetti} onComplete={() => setShowWinConfetti(false)} />}
@@ -119,7 +125,6 @@ export function GameScreen({ state, controls, onBackToStart, onMatchCallbackRead
             elapsedSeconds={elapsedSeconds}
             className={articleLoading ? 'bp-game-timer bp-game-timer--paused' : 'bp-game-timer'}
             prefix="Time: "
-            isPausedForLoading={!state.timerRunning && articleLoading}
           />
         </div>
       </div>
@@ -160,7 +165,6 @@ export function GameScreen({ state, controls, onBackToStart, onMatchCallbackRead
             <TimerDisplay 
               elapsedSeconds={elapsedSeconds} 
               prefix="Time: "
-              isPausedForLoading={!state.timerRunning && articleLoading}
             />
             <span>Clicks: {clickCount}</span>
             {gameWon && (
@@ -190,6 +194,7 @@ export function GameScreen({ state, controls, onBackToStart, onMatchCallbackRead
           onArticleClick={handleArticleClick}
           onLoadingChange={setArticleLoading}
           gameWon={gameWon}
+          isPausedForLoading={isPausedForLoading}
         />
       </section>
     </div>

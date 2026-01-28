@@ -68,6 +68,9 @@
   --link-hover: #93c5fd;
   --link-focus: #93c5fd;
   
+  /* Focus Ring */
+  --focus-ring: #facc15;
+  
   /* Status Colors */
   --status-success: #22c55e;
   --status-success-text: #86efac;
@@ -160,6 +163,9 @@
   --link-color: #2563eb;
   --link-hover: #1d4ed8;
   --link-focus: #1d4ed8;
+  
+  /* Focus Ring */
+  --focus-ring: #ca8a04;
   
   /* Status Colors */
   --status-success: #10b981;

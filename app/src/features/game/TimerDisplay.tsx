@@ -16,11 +16,6 @@ interface TimerDisplayProps {
    * Optional prefix text (e.g., "Time: ")
    */
   prefix?: string
-  /**
-   * Whether the timer is paused for article loading.
-   * When true, displays a message indicating the timer is paused.
-   */
-  isPausedForLoading?: boolean
 }
 
 /**
@@ -31,10 +26,8 @@ interface TimerDisplayProps {
  * 
  * This component only re-renders when the timer display value actually changes,
  * not on every timer tick, preventing link flashing and scroll position loss.
- * 
- * When paused for loading, displays a message indicating the timer is paused.
  */
-export const TimerDisplay = memo(({ elapsedSeconds, className, prefix, isPausedForLoading }: TimerDisplayProps) => {
+export const TimerDisplay = memo(({ elapsedSeconds, className, prefix }: TimerDisplayProps) => {
   const displaySeconds = useTimerDisplay(elapsedSeconds)
   const formattedTime = formatTime(displaySeconds)
   
@@ -42,11 +35,6 @@ export const TimerDisplay = memo(({ elapsedSeconds, className, prefix, isPausedF
     <span className={className}>
       {prefix && <span>{prefix}</span>}
       {formattedTime}
-      {isPausedForLoading && (
-        <span className="bp-timer-paused-message" title="Timer paused while loading article">
-          {' '}(paused)
-        </span>
-      )}
     </span>
   )
 })

@@ -53,28 +53,46 @@
 }
 
 .bp-toc-link {
-  color: var(--link-color, #007bff);
+  color: var(--link-color);
   text-decoration: none;
   display: block;
-  padding: 0.25rem 0;
+  padding: 0.5rem 0.75rem;
+  margin: 0.125rem 0;
   transition: color 0.2s, background-color 0.2s;
   border-radius: 0.25rem;
+  cursor: pointer;
 }
 
 .bp-toc-link:hover {
-  color: var(--link-hover, #0056b3);
-  background-color: var(--bg-input, rgba(0, 123, 255, 0.1));
+  color: var(--link-hover);
+  background-color: var(--bg-hover);
 }
 
 .bp-toc-link:focus {
-  outline: 2px solid var(--focus-ring, #007bff);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+.bp-toc-link:active {
+  background-color: var(--bg-input);
 }
 
 .bp-toc-sublist {
   list-style: none;
   padding: 0;
   margin: 0.25rem 0 0 0;
+}
+
+/* Empty state styling */
+.bp-toc-empty {
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.bp-toc-empty p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
 }
 
 /* ToC is now always in a modal, so no need to hide it */
