@@ -256,6 +256,34 @@ export function extractTableOfContents(html: string, articleTitle?: string): ToC
         return
       }
       
+      // Check href to determine if this is a section link or article link
+      const href = link.getAttribute('href') || ''
+      
+      // Skip article links - only extract section anchors (hrefs starting with #)
+      // Article links include: /wiki/Article, ./Article, Article (without #), http://, etc.
+      const isSectionLink = href.startsWith('#')
+      const isArticleLink = !isSectionLink && (
+        href.includes('/wiki/') ||
+        href.includes('://') ||
+        (href.startsWith('./') && !href.startsWith('./#')) ||
+        (href.startsWith('../') && !href.startsWith('../#')) ||
+        (href.length > 0 && !href.startsWith('#') && !href.startsWith('#'))
+      )
+      
+      if (isArticleLink) {
+        // This is a link to another article, not a section anchor - skip it
+        if (process.env.NODE_ENV === 'development') {
+          console.debug(`[ToC Extraction] Skipping article link: href="${href}"`)
+        }
+        return
+      }
+      
+      // Only proceed if this is a section link (starts with #)
+      if (!isSectionLink) {
+        // Not a section link and not an article link - skip it
+        return
+      }
+      
       // Extract normalized section ID (for storage/display)
       const id = extractSectionId(link)
       
@@ -661,12 +689,12 @@ function ArticleViewerComponent({
     const articleChanged = previousArticleTitleRef.current !== normalized && previousArticleTitleRef.current !== null
 
     // Clear ToC and close modal when article changes
+    // Do this immediately to prevent race conditions
     if (articleChanged) {
       setTocItems([])
       setShowToc(false)
-      // Clear cache for the old article if needed
-      if (previousArticleTitleRef.current) {
-        // Keep cache but clear current items to force re-extraction
+      if (process.env.NODE_ENV === 'development') {
+        console.debug(`[ToC] Article changed - cleared ToC. Old: ${previousArticleTitleRef.current}, New: ${normalized}`)
       }
     }
 
@@ -755,11 +783,32 @@ function ArticleViewerComponent({
           return
         }
         
+        // Filter out any article links that might have slipped through extraction
+        // Only keep items that look like section IDs (no slashes, no URLs)
+        const filteredToc = extractedToc.filter(item => {
+          // Section IDs should not contain slashes, colons, or look like URLs
+          const isValidSectionId = item.id && 
+            !item.id.includes('/') && 
+            !item.id.includes(':') && 
+            !item.id.includes('://') &&
+            !item.id.startsWith('./') &&
+            !item.id.startsWith('../')
+          return isValidSectionId
+        })
+        
         // Set both content and ToC in the same render cycle
         // React 18+ automatically batches these state updates in async functions,
         // so both updates will be processed together without causing multiple re-renders
         setContent(processed)
-        setTocItems(extractedToc)
+        setTocItems(filteredToc)
+        
+        // Update cache with filtered ToC
+        if (filteredToc.length !== extractedToc.length) {
+          tocCacheRef.current.set(normalizedTitle, filteredToc)
+          if (process.env.NODE_ENV === 'development') {
+            console.debug(`[ToC] Filtered ${extractedToc.length - filteredToc.length} article links from ToC`)
+          }
+        }
         
         failureReportedRef.current.delete(articleTitle)
         previousArticleTitleRef.current = normalized
