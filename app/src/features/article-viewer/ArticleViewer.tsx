@@ -1708,21 +1708,18 @@ function ArticleViewerComponent({
       <div className="bp-article-layout">
         {/* Desktop: Inline Table of Contents */}
         {showToc && !loading && content && (
-          <div className="bp-toc-inline">
+          <div className="bp-toc-inline" onClick={(e) => e.stopPropagation()}>
             <div className="bp-toc-inline-header">
               <h3>Table of Contents</h3>
-              <button 
-                className="bp-toc-inline-close" 
-                onClick={() => setShowToc(false)} 
-                aria-label="Close Table of Contents"
-              >
-                ✕
-              </button>
             </div>
             <TableOfContents items={tocItems} onNavigate={handleTocNavigate} hideHeader={true} />
           </div>
         )}
-        <div className="bp-article-content" ref={contentRef}>
+        <div 
+          className="bp-article-content" 
+          ref={contentRef}
+          onClick={() => showToc && setShowToc(false)}
+        >
           {loading && (
             <div className="bp-article-loading">
               <div className="bp-spinner"></div>
@@ -1816,13 +1813,6 @@ function ArticleViewerComponent({
           >
             <div className="bp-modal-header">
               <h3 id="toc-modal-title" className="bp-modal-title">Table of Contents</h3>
-              <button 
-                className="bp-modal-close" 
-                onClick={() => setShowToc(false)} 
-                aria-label="Close Table of Contents"
-              >
-                ✕
-              </button>
             </div>
             <div className="bp-modal-body bp-toc-modal-body">
               {loading ? (
