@@ -226,10 +226,6 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
     }
   }
 
-  const getSortIndicator = (field: FetchLeaderboardParams['sortBy']) => {
-    // No arrows, just use highlighting
-    return null
-  }
 
   return (
     <div className="bp-start-leaderboard">

@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from 'react'
+import { useState, memo } from 'react'
 import { submitScore } from '../../shared/api/leaderboardClient'
 import type { GameGridCell } from './types'
 import { getCuratedArticleTitle } from '../../shared/data/types'
@@ -93,7 +93,7 @@ async function addFoundTagsToHistory(history: string[], bingoSquares: string[]):
  * @param props.articleHistory - Array of visited article titles
  * @param props.onClose - Callback when the modal should be closed
  */
-function WinModalComponent({ clicks, time, gridCells, matchedArticles, articleHistory, gameType, onClose, hashedId }: WinModalProps) {
+function WinModalComponent({ clicks, time, gridCells, articleHistory, gameType, onClose, hashedId }: WinModalProps) {
   const [username, setUsername] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -157,6 +157,7 @@ function WinModalComponent({ clicks, time, gridCells, matchedArticles, articleHi
         score,
         time,
         clicks,
+        bingoSquares,
         ...(bingopediaGame && { bingopediaGame }),
         history: taggedHistory,
         ...(hashedId && { generatedGame: hashedId }),

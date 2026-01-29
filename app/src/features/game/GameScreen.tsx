@@ -33,7 +33,7 @@ interface GameScreenProps {
  * @param props.onBackToStart - Callback to return to the start screen
  */
 export function GameScreen({ state, controls, onBackToStart, onMatchCallbackReady }: GameScreenProps) {
-  const { clickCount, elapsedSeconds, gameWon, currentArticleTitle, gridCells, matchedArticles, winningCells, articleHistory, articleLoading, gameId, gameType } = state
+  const { clickCount, elapsedSeconds, gameWon, currentArticleTitle, gridCells, matchedArticles, winningCells, articleHistory, articleLoading, gameType } = state
   const { registerNavigation, setArticleLoading, replaceFailedArticle } = controls
   const [summaryModalTitle, setSummaryModalTitle] = useState<string | null>(null)
   const [showWinModal, setShowWinModal] = useState(false)

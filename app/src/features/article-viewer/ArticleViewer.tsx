@@ -207,7 +207,7 @@ export function extractTableOfContents(html: string, articleTitle?: string): ToC
     // The text is usually in a .toctext span, so check for that first
     const toctextSpan = link.querySelector('.toctext')
     if (toctextSpan) {
-      const text = toctextSpan.textContent?.trim() || toctextSpan.innerText?.trim() || ''
+      const text = toctextSpan.textContent?.trim() || (toctextSpan instanceof HTMLElement ? toctextSpan.innerText?.trim() : '') || ''
       if (text && text.length >= 2) {
         return text
       }
@@ -443,7 +443,7 @@ export function extractTableOfContents(html: string, articleTitle?: string): ToC
       
       // If no ID, try to generate one from the text
       if (!headingId) {
-        const headingText = heading.textContent?.trim() || heading.innerText?.trim() || ''
+        const headingText = heading.textContent?.trim() || (heading instanceof HTMLElement ? heading.innerText?.trim() : '') || ''
         if (headingText) {
           // Generate ID from text (similar to how Wikipedia does it)
           headingId = headingText
@@ -455,7 +455,7 @@ export function extractTableOfContents(html: string, articleTitle?: string): ToC
         }
       }
       
-      const headingText = heading.textContent?.trim() || heading.innerText?.trim() || ''
+      const headingText = heading.textContent?.trim() || (heading instanceof HTMLElement ? heading.innerText?.trim() : '') || ''
       
       // Skip if no ID or text
       if (!headingId || !headingText || headingText.length < 2) {
@@ -581,7 +581,7 @@ function ArticleViewerComponent({
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   // Immediate feedback state management
   /** Tracks the title of the link that was clicked for visual feedback */
-  const [clickedLinkTitle, setClickedLinkTitle] = useState<string | null>(null)
+  const [, setClickedLinkTitle] = useState<string | null>(null)
   /** Prevents multiple clicks during navigation to avoid double-loads */
   const [isNavigating, setIsNavigating] = useState(false)
   // Table of Contents state

@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react'
 import { useTheme } from '../theme/ThemeContext'
 import './ThemeToggle.css'
 
@@ -14,7 +15,7 @@ import './ThemeToggle.css'
 export function ThemeToggle() {
   const { theme, toggleTheme } = useTheme()
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       toggleTheme()

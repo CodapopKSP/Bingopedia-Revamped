@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { resolveRedirect, clearRedirectCache } from './resolveRedirect'
-import { retry } from '../utils/retry'
 
 // Mock fetch and retry
 global.fetch = vi.fn()

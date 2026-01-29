@@ -18,6 +18,7 @@ export default defineConfig({
       },
     },
   },
+  // @ts-expect-error - Vitest config is valid but TypeScript doesn't recognize it without vitest/config import
   test: {
     globals: true,
     environment: 'jsdom',
