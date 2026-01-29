@@ -108,12 +108,13 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
 
     setIsReplaying(true)
     try {
-      if (entry.gameId) {
-        // Load from gameId - pass gameId and let handler load it
+      // Prefer generatedGame (link to generated-games collection) if available
+      if (entry.generatedGame) {
+        // Load from generated-games collection using the generatedGame link
         await onReplay({
           gridCells: [], // Will be loaded from API
           startingArticle: { title: '' }, // Will be loaded from API
-          gameId: entry.gameId,
+          hashedId: entry.generatedGame,
           gameType: 'repeat',
         })
       } else if (entry.bingopediaGame && entry.bingopediaGame.length >= 26) {
@@ -138,7 +139,7 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
           gameType: 'repeat',
         })
       } else {
-        console.error('Cannot replay: missing gameId or game data')
+        console.error('Cannot replay: missing generatedGame or game data')
       }
     } catch (error) {
       console.error('Failed to replay game:', error)
@@ -266,7 +267,7 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
             )}
           </div>
           {onReplay &&
-            (entry.gameId ||
+            (entry.generatedGame ||
               (entry.bingopediaGame && entry.bingopediaGame.length >= 26) ||
               (entry.bingoSquares && entry.history && entry.history.length > 0)) && (
             <div className="bp-game-details-actions">

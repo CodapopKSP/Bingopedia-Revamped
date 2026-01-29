@@ -87,11 +87,24 @@ export function App() {
       // Prefer hashedId, fall back to gameId for backward compatibility
       const identifier = gameState.hashedId || gameState.gameId
       if (identifier) {
-        // Load from hashedId or gameId
-        await controls.loadGameFromId(identifier)
+        // Load from hashedId or gameId, preserving gameId if provided (for replay scenarios)
+        await controls.loadGameFromId(identifier, gameState.gameId)
+        
+        // Update URL to the game's link (path-based format: /{hashedId})
+        // Only update if we have a hashedId (16-character hash), not for legacy gameId (UUID)
+        if (gameState.hashedId && gameState.hashedId.length === 16 && /^[A-Za-z0-9_-]+$/.test(gameState.hashedId)) {
+          const newPath = `/${gameState.hashedId}`
+          if (window.location.pathname !== newPath) {
+            window.history.pushState({}, '', newPath)
+          }
+        }
       } else if (gameState.gridCells && gameState.gridCells.length > 0 && gameState.startingArticle) {
         // Start with provided state (reconstructed from bingoSquares/history)
         await controls.startNewGame(gameState)
+        // Clear URL for reconstructed games (no shareable link)
+        if (window.location.pathname !== '/' || window.location.search) {
+          window.history.pushState({}, '', '/')
+        }
       } else {
         throw new Error('Cannot replay: missing game data')
       }
@@ -129,7 +142,13 @@ export function App() {
               <GameScreen
                 state={state}
                 controls={controls}
-                onBackToStart={() => setView('start')}
+                onBackToStart={() => {
+                  // Reset URL to home when starting a new game
+                  if (window.location.pathname !== '/' || window.location.search) {
+                    window.history.pushState({}, '', '/')
+                  }
+                  setView('start')
+                }}
                 onMatchCallbackReady={(callback) => {
                   onMatchRef.current = callback
                 }}

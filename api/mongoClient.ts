@@ -12,13 +12,19 @@ export interface LeaderboardEntry {
   bingopediaGame?: string[];
   history: string[];
   createdAt: Date;
-  gameId?: string; // Optional for backward compatibility
   /**
    * Game type: 'random' for random games, 'repeat' for repeat/linked games.
    * Optional field, defaults to 'random' if not provided.
    * Terminology updated from 'fresh'/'linked' to 'random'/'repeat'.
    */
   gameType?: 'random' | 'repeat';
+  /**
+   * 16-character URL-safe hash ID uniquely identifying this leaderboard entry.
+   * For repeat games, this references the game in the generated-games collection.
+   * For random games, this is generated automatically.
+   * Always present for new entries, but optional for backward compatibility with old entries.
+   */
+  generatedGame?: string;
   /**
    * @deprecated Use bingopediaGame instead. This field is kept for backward compatibility with old entries.
    */
@@ -37,6 +43,11 @@ export interface GeneratedGame {
   bingopediaGame: string[];
   createdAt: Date;
   timesPlayed: number;
+  /**
+   * Source of the game: 'leaderboard' for games synced from leaderboard entries,
+   * 'generated' for games created via the shareable game feature.
+   */
+  source?: 'leaderboard' | 'generated';
 }
 
 /**

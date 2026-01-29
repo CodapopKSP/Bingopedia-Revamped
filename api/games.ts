@@ -153,6 +153,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             bingopediaGame: bingopediaGame.map(String),
             createdAt: new Date(),
             timesPlayed: 0,
+            source: 'generated',
           };
 
           const result = await collection.insertOne(gameState);

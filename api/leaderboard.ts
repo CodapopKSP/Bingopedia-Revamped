@@ -1,10 +1,26 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getLeaderboardCollection, getGamesCollection, type LeaderboardEntry } from './mongoClient';
+import { randomBytes } from 'crypto';
+import { getLeaderboardCollection, getGamesCollection, type LeaderboardEntry, type GeneratedGame } from './mongoClient';
 import {
   validateAndSanitizeUsername,
   validateScoreData,
+  calculateScore,
+  validateGameMetrics,
 } from './validation';
 import { createErrorResponse, handleApiError } from './errors';
+
+/**
+ * Generates a 16-character URL-safe hashed ID.
+ * Uses 12 random bytes converted to base64url encoding, truncated to 16 characters.
+ *
+ * @returns 16-character URL-safe hash
+ */
+function generateHashedId(): string {
+  // Generate 12 random bytes (96 bits)
+  const bytes = randomBytes(12);
+  // Convert to base64url (URL-safe, no padding)
+  return bytes.toString('base64url').substring(0, 16);
+}
 
 type SortField = 'score' | 'clicks' | 'time' | 'createdAt' | 'username';
 type SortOrder = 'asc' | 'desc';
@@ -245,7 +261,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
-      const { username, score, time, clicks, history, bingopediaGame, gameId, gameType } = req.body || {};
+      const { username, score, time, clicks, history, bingopediaGame, generatedGame, gameType } = req.body || {};
       
       // Debug logging for score submission
       console.log('[Leaderboard POST] Received data:', {
@@ -255,7 +271,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         bingopediaGameLength: Array.isArray(bingopediaGame) ? bingopediaGame.length : 0,
         hasHistory: Array.isArray(history),
         historyLength: Array.isArray(history) ? history.length : 0,
-        gameId,
+        generatedGame,
         gameType,
         receivedGameType: gameType
       });
@@ -295,21 +311,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
 
-      // Validate gameType if provided, default to 'random'
-      const validGameType = gameType === 'repeat' ? 'repeat' : 'random';
+      // Validate that clicks and time are consistent with history (prevents manipulation)
+      const metricsValidation = validateGameMetrics(scoreValidation.clicks, scoreValidation.time, history);
+      if (metricsValidation.error) {
+        res.status(400).json(
+          createErrorResponse(
+            'VALIDATION_ERROR',
+            metricsValidation.error,
+            { field: 'gameMetrics', clicks: scoreValidation.clicks, time: scoreValidation.time, historyLength: Array.isArray(history) ? history.length : 0 }
+          )
+        );
+        return;
+      }
+
+      // Recalculate score server-side from time and clicks (ignore client-provided score)
+      // This prevents users from manipulating the score calculation
+      const serverCalculatedScore = calculateScore(scoreValidation.time, scoreValidation.clicks);
+
+      // Determine gameType based on generatedGame presence (server-side truth)
+      // If generatedGame is provided, this is definitely a repeat game (cannot be manipulated by client)
+      // Otherwise, default to 'random'
+      const validGameType = (generatedGame && typeof generatedGame === 'string') ? 'repeat' : 'random';
       
       // Check if bingopediaGame should be included
       const shouldIncludeBingopediaGame = Array.isArray(bingopediaGame) && bingopediaGame.length >= 26;
       
+      // Use provided generatedGame (for repeat games) or generate a new one (for random games)
+      const finalGeneratedGame = generatedGame && typeof generatedGame === 'string' ? generatedGame : generateHashedId();
+      
       console.log('[Leaderboard POST] Processing entry:', {
+        clientScore: scoreValidation.score,
+        serverCalculatedScore,
         validGameType,
         shouldIncludeBingopediaGame,
         bingopediaGameLength: Array.isArray(bingopediaGame) ? bingopediaGame.length : 0,
+        generatedGame: finalGeneratedGame,
+        isRepeatGame: !!generatedGame,
       });
       
       const entry: LeaderboardEntry = {
         username: usernameValidation.username,
-        score: scoreValidation.score,
+        score: serverCalculatedScore, // Use server-calculated score, not client-provided
         time: scoreValidation.time,
         clicks: scoreValidation.clicks,
         ...(shouldIncludeBingopediaGame
@@ -317,23 +359,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           : {}),
         history: Array.isArray(history) ? history.map(String) : [],
         createdAt: new Date(),
-        ...(gameId && { gameId: String(gameId) }),
         gameType: validGameType,
+        generatedGame: finalGeneratedGame,
       };
       
       console.log('[Leaderboard POST] Final entry:', {
         hasGameType: !!entry.gameType,
         gameType: entry.gameType,
         hasBingopediaGame: !!entry.bingopediaGame,
-        bingopediaGameLength: entry.bingopediaGame?.length || 0
+        bingopediaGameLength: entry.bingopediaGame?.length || 0,
+        generatedGame: entry.generatedGame,
       });
 
       const result = await collection.insertOne(entry);
       const insertedEntry = { ...entry, _id: result.insertedId };
 
-      if (gameId) {
-        const gamesCollection = await getGamesCollection();
-        await gamesCollection.updateOne({ link: String(gameId) }, { $inc: { timesPlayed: 1 } });
+      const gamesCollection = await getGamesCollection();
+
+      // If this is a repeat game (has generatedGame that matches an existing game), increment timesPlayed
+      if (generatedGame && typeof generatedGame === 'string') {
+        await gamesCollection.updateOne({ link: String(generatedGame) }, { $inc: { timesPlayed: 1 } });
+      } else if (validGameType === 'random' && shouldIncludeBingopediaGame) {
+        // For random games, create a new generated-games entry
+        try {
+          const newGame: GeneratedGame = {
+            link: finalGeneratedGame,
+            bingopediaGame: bingopediaGame.map(String),
+            createdAt: new Date(),
+            timesPlayed: 0,
+            source: 'leaderboard',
+          };
+          await gamesCollection.insertOne(newGame);
+        } catch (error) {
+          // Log error but don't fail the leaderboard submission
+          // This could happen if there's a collision (very unlikely) or DB issue
+          console.error('[Leaderboard POST] Failed to create generated-games entry:', error);
+        }
       }
 
       res.status(201).json(insertedEntry);

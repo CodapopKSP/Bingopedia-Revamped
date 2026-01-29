@@ -9,13 +9,15 @@
  * Options:
  *   --url <url>          API endpoint URL (default: http://localhost:3001/api/leaderboard)
  *   --username <name>    Username (default: TestUser)
- *   --gameType <type>   Game type: 'random' or 'repeat' (default: random)
+ *   --gameType <type>   Game type: 'random' or 'repeat' (default: random, auto-set to 'repeat' if --generatedGame provided)
+ *   --generatedGame <id> Generated game ID (16-char hash) for shared/repeat games (sets gameType to 'repeat')
  *   --with-bingopedia   Include bingopediaGame field (default: true)
  *   --without-bingopedia Don't include bingopediaGame field
  * 
  * Examples:
  *   node scripts/testScoreSubmission.js
  *   node scripts/testScoreSubmission.js --username "TestPlayer" --gameType random
+ *   node scripts/testScoreSubmission.js --generatedGame "XHZ$G$z4y4zz46" --username "SharedGamePlayer"
  *   node scripts/testScoreSubmission.js --url http://localhost:3000/api/leaderboard
  */
 
@@ -29,6 +31,7 @@ const options = {
   url: 'http://localhost:3001/api/leaderboard',
   username: 'TestUser',
   gameType: 'random',
+  generatedGame: null,
   includeBingopediaGame: true,
 };
 
@@ -40,6 +43,12 @@ for (let i = 0; i < args.length; i++) {
     options.username = args[++i];
   } else if (arg === '--gameType' && args[i + 1]) {
     options.gameType = args[++i];
+  } else if (arg === '--generatedGame' && args[i + 1]) {
+    options.generatedGame = args[++i];
+    // Automatically set gameType to 'repeat' when generatedGame is provided
+    if (!args.includes('--gameType')) {
+      options.gameType = 'repeat';
+    }
   } else if (arg === '--with-bingopedia') {
     options.includeBingopediaGame = true;
   } else if (arg === '--without-bingopedia') {
@@ -106,6 +115,10 @@ async function submitScore() {
     payload.bingopediaGame = bingopediaGame;
   }
   
+  if (options.generatedGame) {
+    payload.generatedGame = options.generatedGame;
+  }
+  
   console.log('Submitting score with payload:');
   console.log(JSON.stringify({
     username: payload.username,
@@ -116,7 +129,9 @@ async function submitScore() {
     bingopediaGameLength: payload.bingopediaGame?.length || 0,
     historyLength: payload.history.length,
     gameType: payload.gameType,
+    generatedGame: payload.generatedGame || '(none)',
     hasBingopediaGame: !!payload.bingopediaGame,
+    isSharedGame: !!payload.generatedGame,
   }, null, 2));
   
   const url = new URL(options.url);
@@ -159,11 +174,14 @@ async function submitScore() {
               score: response.score,
               gameType: response.gameType,
               hasGameType: !!response.gameType,
+              generatedGame: response.generatedGame || '(none)',
+              hasGeneratedGame: !!response.generatedGame,
               hasBingopediaGame: !!response.bingopediaGame,
               bingopediaGameLength: response.bingopediaGame?.length || 0,
               bingoSquaresLength: response.bingoSquares?.length || 0,
               historyLength: response.history?.length || 0,
               createdAt: response.createdAt,
+              isSharedGame: !!response.generatedGame,
             }, null, 2));
             resolve(response);
           } else {

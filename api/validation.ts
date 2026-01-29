@@ -128,3 +128,55 @@ export function calculateScore(time: number, clicks: number): number {
   return time * clicks;
 }
 
+/**
+ * Validates that clicks and time are consistent with the game history.
+ * This prevents users from manipulating clicks/time values.
+ *
+ * @param clicks - Number of clicks/navigations reported
+ * @param time - Game time in seconds reported
+ * @param history - Array of article titles visited (game history)
+ * @returns Validation result with error message if invalid
+ */
+export function validateGameMetrics(
+  clicks: number,
+  time: number,
+  history: unknown
+): { error?: string } {
+  // History must be an array
+  if (!Array.isArray(history)) {
+    return { error: 'History must be an array' };
+  }
+
+  const historyLength = history.length;
+
+  // Clicks should match history length (each navigation adds to history)
+  // Allow small discrepancy (1-2) for edge cases (e.g., starting article might not count as click)
+  const clickDifference = Math.abs(clicks - historyLength);
+  if (clickDifference > 2) {
+    return {
+      error: `Clicks (${clicks}) does not match history length (${historyLength}). Expected clicks to be within 2 of history length.`,
+    };
+  }
+
+  // Time should be reasonable - at least 1 second per click on average
+  // This prevents impossibly fast games (e.g., 1 second for 50 clicks)
+  // Minimum time: 1 second per click, but allow some flexibility (0.5 seconds per click minimum)
+  const minTimePerClick = 0.5;
+  const minExpectedTime = clicks * minTimePerClick;
+  if (time < minExpectedTime) {
+    return {
+      error: `Time (${time}s) is too low for ${clicks} clicks. Minimum expected time is ${minExpectedTime}s (${minTimePerClick}s per click).`,
+    };
+  }
+
+  // Time should not be impossibly high (e.g., more than 24 hours)
+  const MAX_REASONABLE_TIME = 24 * 60 * 60; // 24 hours in seconds
+  if (time > MAX_REASONABLE_TIME) {
+    return {
+      error: `Time (${time}s) exceeds maximum reasonable time (${MAX_REASONABLE_TIME}s).`,
+    };
+  }
+
+  return {}; // Valid
+}
+

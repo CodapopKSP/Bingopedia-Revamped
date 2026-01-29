@@ -38,8 +38,14 @@ export interface LeaderboardEntry {
   bingopediaGame?: string[]
   history?: string[]
   createdAt: string | Date
-  gameId?: string // UUID v4 for replay functionality
   gameType?: 'random' | 'repeat' // Game type
+  /**
+   * 16-character URL-safe hash ID uniquely identifying this leaderboard entry.
+   * For repeat games, this references the game in the generated-games collection.
+   * For random games, this is generated automatically.
+   * Always present for new entries, but optional for backward compatibility with old entries.
+   */
+  generatedGame?: string
   /**
    * @deprecated Use bingopediaGame instead. This field is kept for backward compatibility with old entries.
    */

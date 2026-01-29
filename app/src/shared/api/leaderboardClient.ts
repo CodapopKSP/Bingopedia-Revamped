@@ -98,7 +98,7 @@ export interface SubmitScorePayload {
   bingoSquares: string[]
   bingopediaGame?: string[]
   history: string[]
-  gameId?: string
+  generatedGame?: string
   gameType?: 'random' | 'repeat'
 }
 

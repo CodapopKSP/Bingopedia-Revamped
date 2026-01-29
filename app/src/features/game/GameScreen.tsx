@@ -101,7 +101,6 @@ export function GameScreen({ state, controls, onBackToStart, onMatchCallbackRead
           gridCells={gridCells}
           matchedArticles={matchedArticles}
           articleHistory={articleHistory}
-          gameId={gameId}
           gameType={gameType}
           hashedId={state.hashedId}
           onClose={() => setShowWinModal(false)}

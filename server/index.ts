@@ -188,6 +188,14 @@ app.post('/api/leaderboard', async (req, res) => {
     
     // Check if bingopediaGame should be included
     const shouldIncludeBingopediaGame = Array.isArray(bingopediaGame) && bingopediaGame.length >= 26;
+    
+    // Generate a unique generatedGame hash ID for this leaderboard entry
+    const { randomBytes } = require('crypto');
+    function generateHashedId(): string {
+      const bytes = randomBytes(12);
+      return bytes.toString('base64url').substring(0, 16);
+    }
+    const generatedGame = generateHashedId();
 
     const entry: LeaderboardEntry = {
       username: usernameValidation.username,
@@ -201,6 +209,7 @@ app.post('/api/leaderboard', async (req, res) => {
       createdAt: new Date(),
       ...(gameId && { gameId: String(gameId) }),
       gameType: validGameType,
+      generatedGame,
     };
 
     const result = await collection.insertOne(entry);
@@ -248,6 +257,7 @@ app.post('/api/games', async (req, res) => {
           bingopediaGame: bingopediaGame.map(String),
           createdAt: new Date(),
           timesPlayed: 0,
+          source: 'generated',
         };
 
         const result = await collection.insertOne(gameState);

@@ -186,7 +186,7 @@ export function useGameState(options: UseGameStateOptions = {}): [
   GameState,
   {
     startNewGame: (gameState?: { gridCells: GameGridCell[]; startingArticle: CuratedArticle; gameId?: string; hashedId?: string; gameType?: 'random' | 'repeat' }) => Promise<void>
-    loadGameFromId: (identifier: string) => Promise<void>
+    loadGameFromId: (identifier: string, preserveGameId?: string) => Promise<void>
     createShareableGame: () => Promise<{ gameId: string; url: string }>
     registerNavigation: (title: string) => Promise<void>
     setArticleLoading: (loading: boolean) => void
@@ -263,6 +263,11 @@ export function useGameState(options: UseGameStateOptions = {}): [
       if (providedGameState) {
         // Load game from provided state
         const startingTitle = getCuratedArticleTitle(providedGameState.startingArticle)
+        const gameType = providedGameState.gameType || 'repeat'
+        console.log(`[Game] Starting ${gameType.toUpperCase()} game from provided state`, {
+          hashedId: providedGameState.hashedId,
+          gameId: providedGameState.gameId,
+        })
         setState({
           ...createInitialState(),
           gameStarted: true,
@@ -274,7 +279,7 @@ export function useGameState(options: UseGameStateOptions = {}): [
           articleLoading: false,
           hashedId: providedGameState.hashedId,
           gameId: providedGameState.gameId, // Keep for backward compatibility
-          gameType: providedGameState.gameType || 'repeat',
+          gameType,
         })
       } else {
         // Generate new game
@@ -283,6 +288,7 @@ export function useGameState(options: UseGameStateOptions = {}): [
         const { gridCells, startingArticle } = generateBingoSet(categories, groups)
 
         const startingTitle = getCuratedArticleTitle(startingArticle)
+        console.log('[Game] Starting new RANDOM game')
         setState({
           ...createInitialState(),
           gameStarted: true,
@@ -302,8 +308,9 @@ export function useGameState(options: UseGameStateOptions = {}): [
   /**
    * Loads a game state from the API by hashedId (preferred) or gameId (backward compatibility).
    * @param identifier - Hashed ID (16 chars) or UUID v4 game identifier
+   * @param preserveGameId - Optional gameId to preserve (for replaying leaderboard entries)
    */
-  const loadGameFromId = useCallback(async (identifier: string) => {
+  const loadGameFromId = useCallback(async (identifier: string, preserveGameId?: string) => {
     try {
       const gameState = await fetchGame(identifier)
 
@@ -319,6 +326,10 @@ export function useGameState(options: UseGameStateOptions = {}): [
       const startingArticle = createArticleFromTitle(startingTitle)
       const startingTitleResolved = getCuratedArticleTitle(startingArticle)
       
+      console.log('[Game] Starting REPEAT game from link', {
+        hashedId: gameState.link,
+        preserveGameId,
+      })
       setState({
         ...createInitialState(),
         gameStarted: true,
@@ -329,6 +340,7 @@ export function useGameState(options: UseGameStateOptions = {}): [
         timerRunning: true,
         articleLoading: false,
         hashedId: gameState.link,
+        ...(preserveGameId && { gameId: preserveGameId }), // Preserve gameId for replay scenarios
         gameType: 'repeat',
       })
     } catch (error) {

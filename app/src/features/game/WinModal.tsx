@@ -15,9 +15,9 @@ interface WinModalProps {
   gridCells: GameGridCell[]
   matchedArticles: Set<string>
   articleHistory: string[]
-  gameId?: string
   gameType?: 'random' | 'repeat'
   onClose: () => void
+  hashedId?: string
 }
 
 /**
@@ -93,7 +93,7 @@ async function addFoundTagsToHistory(history: string[], bingoSquares: string[]):
  * @param props.articleHistory - Array of visited article titles
  * @param props.onClose - Callback when the modal should be closed
  */
-function WinModalComponent({ clicks, time, gridCells, matchedArticles, articleHistory, gameId, gameType, onClose, hashedId }: WinModalProps & { hashedId?: string }) {
+function WinModalComponent({ clicks, time, gridCells, matchedArticles, articleHistory, gameType, onClose, hashedId }: WinModalProps) {
   const [username, setUsername] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -148,7 +148,7 @@ function WinModalComponent({ clicks, time, gridCells, matchedArticles, articleHi
         startingTitle,
         bingopediaGameLength: bingopediaGame?.length,
         gameType: finalGameType,
-        hasGameId: !!gameId,
+        hasGeneratedGame: !!hashedId,
         historyLength: taggedHistory.length
       })
 
@@ -159,7 +159,7 @@ function WinModalComponent({ clicks, time, gridCells, matchedArticles, articleHi
         clicks,
         ...(bingopediaGame && { bingopediaGame }),
         history: taggedHistory,
-        ...(gameId && { gameId }),
+        ...(hashedId && { generatedGame: hashedId }),
         gameType: finalGameType,
       })
 
