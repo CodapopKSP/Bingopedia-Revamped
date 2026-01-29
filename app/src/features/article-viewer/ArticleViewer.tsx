@@ -596,6 +596,8 @@ function ArticleViewerComponent({
   const [retryCount, setRetryCount] = useState(0)
   /** Whether we're currently in a retry attempt (not the initial load) */
   const [isRetrying, setIsRetrying] = useState(false)
+  // Reload state - increments to force reload
+  const [reloadKey, setReloadKey] = useState(0)
   const contentRef = useRef<HTMLDivElement>(null)
   const failureReportedRef = useRef(new Set<string>())
   const currentLoadingTitleRef = useRef<string | null>(null)
@@ -687,6 +689,12 @@ function ArticleViewerComponent({
 
     const normalized = normalizeTitle(articleTitle)
     const articleChanged = previousArticleTitleRef.current !== normalized && previousArticleTitleRef.current !== null
+    
+    // If reloadKey changed, clear cache for this article to force fresh load
+    if (reloadKey > 0) {
+      tocCacheRef.current.delete(normalized)
+      currentLoadingTitleRef.current = null
+    }
 
     // Clear ToC and close modal when article changes
     // Do this immediately to prevent race conditions
@@ -873,7 +881,7 @@ function ArticleViewerComponent({
         retryTimeoutRef.current = null
       }
     }
-  }, [articleTitle, onArticleLoadFailure])
+  }, [articleTitle, onArticleLoadFailure, reloadKey])
 
   // Restore scroll position and focus when content changes (but only if article hasn't changed)
   useEffect(() => {
@@ -1107,6 +1115,33 @@ function ArticleViewerComponent({
     setShowToc((prev) => !prev)
     // Modal opens immediately - if tocItems is empty, loading state will be shown
   }, [loading, content])
+
+  /**
+   * Handles reloading the article from scratch.
+   * Clears cache and forces a fresh load.
+   */
+  const handleReload = useCallback(() => {
+    if (!articleTitle) return
+    
+    // Clear cache for this article
+    const normalized = normalizeTitle(articleTitle)
+    tocCacheRef.current.delete(normalized)
+    
+    // Clear current loading state
+    currentLoadingTitleRef.current = null
+    
+    // Clear any pending retry timeout
+    if (retryTimeoutRef.current !== null) {
+      window.clearTimeout(retryTimeoutRef.current)
+      retryTimeoutRef.current = null
+    }
+    
+    // Reset error state
+    setError(null)
+    
+    // Increment reload key to trigger useEffect reload
+    setReloadKey((prev) => prev + 1)
+  }, [articleTitle])
 
   /**
    * Normalizes a section ID for matching (same logic as in extractTableOfContents).
@@ -1745,6 +1780,24 @@ function ArticleViewerComponent({
           </div>
         </div>
       )}
+      {/* Reload button at the bottom */}
+      <div className="bp-article-reload-container">
+        <button
+          type="button"
+          className="bp-article-reload-button"
+          onClick={handleReload}
+          disabled={!articleTitle || loading}
+          aria-label="Reload article"
+          title="Reload article from scratch"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          <span>Reload Article</span>
+        </button>
+      </div>
     </div>
   )
 }
