@@ -1,0 +1,93 @@
+.bp-rules-modal-overlay {
+  z-index: 1001; /* Above other modals */
+}
+
+.bp-rules-modal-content {
+  max-width: 700px;
+  max-height: 85vh;
+}
+
+.bp-rules-modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.bp-rules-section {
+  margin-bottom: 2rem;
+}
+
+.bp-rules-section:last-child {
+  margin-bottom: 0;
+}
+
+.bp-rules-section-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-accent);
+}
+
+.bp-rules-text {
+  margin: 0 0 0.75rem;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.bp-rules-text:last-child {
+  margin-bottom: 0;
+}
+
+.bp-rules-list {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+  color: var(--text-primary);
+  line-height: 1.7;
+}
+
+.bp-rules-list li {
+  margin-bottom: 0.75rem;
+}
+
+.bp-rules-list li:last-child {
+  margin-bottom: 0;
+}
+
+.bp-rules-list strong {
+  color: var(--text-accent);
+  font-weight: 600;
+}
+
+.bp-rules-example {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-secondary);
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  margin-top: 0.75rem;
+}
+
+.bp-rules-example .bp-rules-text {
+  margin-bottom: 1rem;
+}
+
+.bp-rules-example .bp-rules-list {
+  margin-top: 0.75rem;
+}
+
+/* Scrollbar styling for rules modal */
+.bp-rules-modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.bp-rules-modal-body::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+.bp-rules-modal-body::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+
+.bp-rules-modal-body::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+

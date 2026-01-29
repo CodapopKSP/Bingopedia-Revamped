@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import './StartScreen.css'
 import { StartScreenLeaderboard } from '../leaderboard/StartScreenLeaderboard'
+import { RulesModal } from './RulesModal'
 import type { GameGridCell } from './types'
 import type { CuratedArticle } from '../../shared/data/types'
 
@@ -23,6 +24,7 @@ export function StartScreen({ onStart, onCreateShareableGame, onReplay }: StartS
   const [shareableUrl, setShareableUrl] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
+  const [showRules, setShowRules] = useState(false)
 
   const handleGenerateShareable = async () => {
     if (!onCreateShareableGame) return
@@ -56,11 +58,21 @@ export function StartScreen({ onStart, onCreateShareableGame, onReplay }: StartS
     <div className="bp-start-screen">
       <section className="bp-start-hero">
         <div>
-          <h2>Wiki Bingo, Reimagined</h2>
-          <p>
-            Navigate Wikipedia from a random starting article to complete a 5×5 bingo card of
-            target articles. Every click and every second counts toward your final score.
-          </p>
+          <h2>Welcome to Bingopedia</h2>
+          <div className="bp-start-description">
+            <p>
+              Start from a random Wikipedia article and navigate by clicking links to reach target articles on your 5×5 bingo card. 
+              Win by completing any line of 5 articles (row, column, or diagonal).
+            </p>
+            <button
+              className="bp-rules-button"
+              type="button"
+              onClick={() => setShowRules(true)}
+              aria-label="View detailed rules"
+            >
+              How to Play
+            </button>
+          </div>
           <div className="bp-start-actions">
             <button className="bp-start-button" type="button" onClick={() => void onStart()} aria-label="Start a new game">
               Start Game
@@ -77,6 +89,7 @@ export function StartScreen({ onStart, onCreateShareableGame, onReplay }: StartS
               </button>
             )}
           </div>
+          {showRules && <RulesModal onClose={() => setShowRules(false)} />}
           {shareableUrl && (
             <div className="bp-shareable-link-container">
               <p className="bp-shareable-link-label">Share this game:</p>
