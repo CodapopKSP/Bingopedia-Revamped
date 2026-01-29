@@ -35,12 +35,15 @@ export interface LeaderboardEntry {
   score: number
   time: number
   clicks: number
-  bingoSquares?: string[]
   bingopediaGame?: string[]
   history?: string[]
   createdAt: string | Date
   gameId?: string // UUID v4 for replay functionality
   gameType?: 'random' | 'repeat' // Game type
+  /**
+   * @deprecated Use bingopediaGame instead. This field is kept for backward compatibility with old entries.
+   */
+  bingoSquares?: string[]
 }
 
 /**

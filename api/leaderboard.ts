@@ -245,7 +245,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
-      const { username, score, time, clicks, bingoSquares, history, bingopediaGame, gameId, gameType } = req.body || {};
+      const { username, score, time, clicks, history, bingopediaGame, gameId, gameType } = req.body || {};
+      
+      // Debug logging for score submission
+      console.log('[Leaderboard POST] Received data:', {
+        username,
+        score,
+        hasBingopediaGame: Array.isArray(bingopediaGame),
+        bingopediaGameLength: Array.isArray(bingopediaGame) ? bingopediaGame.length : 0,
+        hasHistory: Array.isArray(history),
+        historyLength: Array.isArray(history) ? history.length : 0,
+        gameId,
+        gameType,
+        receivedGameType: gameType
+      });
 
       if (!username || score === undefined) {
         res.status(400).json(
@@ -284,13 +297,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Validate gameType if provided, default to 'random'
       const validGameType = gameType === 'repeat' ? 'repeat' : 'random';
+      
+      // Check if bingopediaGame should be included
+      const shouldIncludeBingopediaGame = Array.isArray(bingopediaGame) && bingopediaGame.length >= 26;
+      
+      console.log('[Leaderboard POST] Processing entry:', {
+        validGameType,
+        shouldIncludeBingopediaGame,
+        bingopediaGameLength: Array.isArray(bingopediaGame) ? bingopediaGame.length : 0,
+      });
+      
       const entry: LeaderboardEntry = {
         username: usernameValidation.username,
         score: scoreValidation.score,
         time: scoreValidation.time,
         clicks: scoreValidation.clicks,
-        bingoSquares: Array.isArray(bingoSquares) ? bingoSquares.map(String) : [],
-        ...(Array.isArray(bingopediaGame) && bingopediaGame.length >= 26
+        ...(shouldIncludeBingopediaGame
           ? { bingopediaGame: bingopediaGame.map(String) }
           : {}),
         history: Array.isArray(history) ? history.map(String) : [],
@@ -298,6 +320,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ...(gameId && { gameId: String(gameId) }),
         gameType: validGameType,
       };
+      
+      console.log('[Leaderboard POST] Final entry:', {
+        hasGameType: !!entry.gameType,
+        gameType: entry.gameType,
+        hasBingopediaGame: !!entry.bingopediaGame,
+        bingopediaGameLength: entry.bingopediaGame?.length || 0
+      });
 
       const result = await collection.insertOne(entry);
       const insertedEntry = { ...entry, _id: result.insertedId };

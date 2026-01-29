@@ -62,9 +62,11 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const previouslyFocusedElementRef = useRef<Element | null>(null)
   
+  // Derive board squares from bingopediaGame (first 25 elements)
+  // Fall back to legacy bingoSquares for old entries
   const boardSquares =
-    entry.bingoSquares?.slice(0, 25) ??
     entry.bingopediaGame?.slice(0, 25) ??
+    entry.bingoSquares?.slice(0, 25) ??
     []
   const gridCells = boardSquares.length > 0 ? parseBingoSquares(boardSquares) : []
   const matchedArticles = new Set<string>()
@@ -126,7 +128,7 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
           gameType: 'repeat',
         })
       } else if (entry.bingoSquares && entry.history && entry.history.length > 0) {
-        // Reconstruct from bingoSquares and history
+        // Legacy: Reconstruct from bingoSquares and history (for old entries)
         const startingArticle: CuratedArticle = {
           title: stripFoundTag(entry.history[0]),
         }

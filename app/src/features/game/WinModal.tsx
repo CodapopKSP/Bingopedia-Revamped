@@ -128,19 +128,39 @@ function WinModalComponent({ clicks, time, gridCells, matchedArticles, articleHi
       const bingoSquares = formatBingoSquares(gridCells)
       const history = articleHistory || []
       const taggedHistory = await addFoundTagsToHistory(history, bingoSquares)
-      const startingTitle = history[0]
-      const bingopediaGame = startingTitle ? [...bingoSquares, startingTitle] : undefined
+      
+      // Get starting title from history (first element is always the starting article)
+      const startingTitle = history[0] || history.find(title => title && !title.startsWith('[Found]'))
+      
+      // Always create bingopediaGame if we have bingoSquares and a starting title
+      // bingopediaGame should be 26 elements: 25 bingo squares + 1 starting title
+      let bingopediaGame: string[] | undefined = undefined
+      if (bingoSquares.length === 25 && startingTitle) {
+        bingopediaGame = [...bingoSquares, startingTitle]
+      }
+
+      // Always include gameType, defaulting to 'random' if not provided
+      const finalGameType = gameType || 'random'
+
+      // Debug logging
+      console.log('[WinModal] Submitting score:', {
+        bingoSquaresLength: bingoSquares.length,
+        startingTitle,
+        bingopediaGameLength: bingopediaGame?.length,
+        gameType: finalGameType,
+        hasGameId: !!gameId,
+        historyLength: taggedHistory.length
+      })
 
       await submitScore({
         username: username.trim(),
         score,
         time,
         clicks,
-        bingoSquares,
         ...(bingopediaGame && { bingopediaGame }),
         history: taggedHistory,
         ...(gameId && { gameId }),
-        ...(gameType && { gameType }),
+        gameType: finalGameType,
       })
 
       // Log game_finished event (non-blocking)

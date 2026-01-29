@@ -141,8 +141,9 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all')
   const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilter>('random')
   const [page, setPage] = useState(1)
-  const [limit] = useState(20) // Increased from 5 to 20
+  const [limit] = useState(10) // 10 games per page
   const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
   // Reset page to 1 when filters change
   useEffect(() => {
@@ -167,6 +168,14 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
         if (!cancelled) {
           setEntries(res.users)
           setTotalPages(res.pagination.totalPages)
+          setTotalCount(res.pagination.totalCount)
+          console.log('[Frontend] Pagination:', {
+            totalPages: res.pagination.totalPages,
+            totalCount: res.pagination.totalCount,
+            currentPage: res.pagination.page,
+            limit: res.pagination.limit,
+            entriesReceived: res.users.length
+          })
         }
       } catch (e) {
         if (!cancelled) {
@@ -199,6 +208,7 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
       .then((res) => {
         setEntries(res.users)
         setTotalPages(res.pagination.totalPages)
+        setTotalCount(res.pagination.totalCount)
         setLoading(false)
       })
       .catch(() => {
@@ -338,31 +348,57 @@ export function StartScreenLeaderboard({ onReplay }: StartScreenLeaderboardProps
               })}
             </tbody>
           </table>
-          {totalPages > 1 && (
-            <div className="bp-pagination">
-              <button
-                type="button"
-                className="bp-pagination-button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                aria-label="Previous page"
-              >
-                Previous
-              </button>
-              <span className="bp-pagination-info">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                type="button"
-                className="bp-pagination-button"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                aria-label="Next page"
-              >
-                Next
-              </button>
-            </div>
-          )}
+          {(() => {
+            // Calculate totalPages from totalCount if backend didn't provide it correctly
+            const calculatedTotalPages = totalCount > 0 ? Math.ceil(totalCount / limit) : totalPages;
+            const effectiveTotalPages = Math.max(totalPages, calculatedTotalPages, totalPages > 0 ? totalPages : 1);
+            
+            // Show pagination if we have more than one page OR if we got exactly limit entries (suggesting more pages exist)
+            const hasMorePages = effectiveTotalPages > 1;
+            const mightHaveMore = entries.length === limit && page === 1;
+            const shouldShow = hasMorePages || mightHaveMore || totalCount > limit;
+            
+            console.log('[Frontend] Pagination check:', {
+              shouldShow,
+              hasMorePages,
+              mightHaveMore,
+              totalPages,
+              calculatedTotalPages,
+              effectiveTotalPages,
+              totalCount,
+              entriesLength: entries.length,
+              limit,
+              page
+            });
+            
+            if (!shouldShow) return null;
+            
+            return (
+              <div className="bp-pagination">
+                <button
+                  type="button"
+                  className="bp-pagination-button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  aria-label="Previous page"
+                >
+                  Previous
+                </button>
+                <span className="bp-pagination-info">
+                  Page {page} of {effectiveTotalPages} {totalCount > 0 && `(${totalCount} total)`}
+                </span>
+                <button
+                  type="button"
+                  className="bp-pagination-button"
+                  onClick={() => setPage((p) => Math.min(effectiveTotalPages, p + 1))}
+                  disabled={page >= effectiveTotalPages}
+                  aria-label="Next page"
+                >
+                  Next
+                </button>
+              </div>
+            );
+          })()}
         </>
       )}
       {selectedEntry && (

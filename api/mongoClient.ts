@@ -9,7 +9,6 @@ export interface LeaderboardEntry {
   score: number;
   time: number;
   clicks: number;
-  bingoSquares: string[];
   bingopediaGame?: string[];
   history: string[];
   createdAt: Date;
@@ -20,6 +19,10 @@ export interface LeaderboardEntry {
    * Terminology updated from 'fresh'/'linked' to 'random'/'repeat'.
    */
   gameType?: 'random' | 'repeat';
+  /**
+   * @deprecated Use bingopediaGame instead. This field is kept for backward compatibility with old entries.
+   */
+  bingoSquares?: string[];
 }
 
 export interface GeneratedGame {

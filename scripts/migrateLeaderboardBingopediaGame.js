@@ -31,25 +31,92 @@ async function migrateLeaderboardBingopediaGame() {
     const db = client.db(DB_NAME)
     const collection = db.collection(COLLECTION_NAME)
 
+    // Find entries that need migration:
+    // - Have bingoSquares but no bingopediaGame, OR
+    // - Missing gameType
     const filter = {
-      bingopediaGame: { $exists: false },
-      bingoSquares: { $size: 25 },
-      history: { $exists: true, $ne: [] },
+      $or: [
+        {
+          bingopediaGame: { $exists: false },
+          bingoSquares: { $exists: true, $size: 25 },
+          history: { $exists: true, $ne: [] },
+        },
+        {
+          gameType: { $exists: false },
+        },
+      ],
     }
 
-    const result = await collection.updateMany(filter, [
-      {
-        $set: {
-          bingopediaGame: {
-            $concatArrays: ['$bingoSquares', [{ $arrayElemAt: ['$history', 0] }]],
-          },
-        },
-      },
-    ])
+    console.log('Finding entries to migrate...')
+    const entriesToMigrate = await collection.find(filter).toArray()
+    console.log(`Found ${entriesToMigrate.length} entries to migrate`)
 
-    console.log(
-      `Updated ${result.modifiedCount} entries with bingopediaGame (matched ${result.matchedCount}).`
-    )
+    if (entriesToMigrate.length === 0) {
+      console.log('No entries need migration.')
+      return
+    }
+
+    let updatedCount = 0
+    let skippedCount = 0
+    let errorCount = 0
+    let bingopediaGameAdded = 0
+    let gameTypeAdded = 0
+
+    for (const entry of entriesToMigrate) {
+      try {
+        const updates = {}
+        let needsUpdate = false
+
+        // Add bingopediaGame if missing
+        if (!entry.bingopediaGame && entry.bingoSquares && entry.history) {
+          const bingoSquares = entry.bingoSquares || []
+          const history = entry.history || []
+          const startingTitle = history[0]
+
+          // Validate we have what we need
+          if (bingoSquares.length === 25 && startingTitle) {
+            // Create bingopediaGame: 25 squares + 1 starting title = 26 elements
+            updates.bingopediaGame = [...bingoSquares, startingTitle]
+            needsUpdate = true
+            bingopediaGameAdded++
+          } else {
+            console.log(`Skipping bingopediaGame for entry ${entry._id}: bingoSquares has ${bingoSquares.length} elements or missing starting title`)
+          }
+        }
+
+        // Add gameType if missing (default to 'random')
+        if (!entry.gameType) {
+          updates.gameType = 'random'
+          needsUpdate = true
+          gameTypeAdded++
+        }
+
+        // Update the entry if we have changes
+        if (needsUpdate) {
+          await collection.updateOne(
+            { _id: entry._id },
+            { $set: updates }
+          )
+
+          updatedCount++
+          if (updatedCount % 100 === 0) {
+            console.log(`Progress: Updated ${updatedCount} entries...`)
+          }
+        } else {
+          skippedCount++
+        }
+      } catch (error) {
+        console.error(`Error updating entry ${entry._id}:`, error.message)
+        errorCount++
+      }
+    }
+
+    console.log('\nMigration complete!')
+    console.log(`  Updated: ${updatedCount} entries`)
+    console.log(`    - Added bingopediaGame: ${bingopediaGameAdded} entries`)
+    console.log(`    - Added gameType: ${gameTypeAdded} entries`)
+    console.log(`  Skipped: ${skippedCount} entries`)
+    console.log(`  Errors: ${errorCount} entries`)
   } catch (error) {
     console.error('Error during migration:', error)
     process.exit(1)

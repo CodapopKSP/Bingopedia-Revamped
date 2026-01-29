@@ -146,7 +146,7 @@ app.get('/api/leaderboard', async (req, res) => {
 app.post('/api/leaderboard', async (req, res) => {
   try {
     const collection = await getLeaderboardCollection();
-    const { username, score, time, clicks, bingoSquares, history, gameId } = req.body || {};
+    const { username, score, time, clicks, history, bingopediaGame, gameId, gameType } = req.body || {};
 
     if (!username || score === undefined) {
       res.status(400).json(
@@ -183,14 +183,24 @@ app.post('/api/leaderboard', async (req, res) => {
       return;
     }
 
+    // Validate gameType if provided, default to 'random'
+    const validGameType = gameType === 'repeat' ? 'repeat' : 'random';
+    
+    // Check if bingopediaGame should be included
+    const shouldIncludeBingopediaGame = Array.isArray(bingopediaGame) && bingopediaGame.length >= 26;
+
     const entry: LeaderboardEntry = {
       username: usernameValidation.username,
       score: scoreValidation.score,
       time: scoreValidation.time,
       clicks: scoreValidation.clicks,
-      bingoSquares: Array.isArray(bingoSquares) ? bingoSquares.map(String) : [],
+      ...(shouldIncludeBingopediaGame
+        ? { bingopediaGame: bingopediaGame.map(String) }
+        : {}),
       history: Array.isArray(history) ? history.map(String) : [],
       createdAt: new Date(),
+      ...(gameId && { gameId: String(gameId) }),
+      gameType: validGameType,
     };
 
     const result = await collection.insertOne(entry);
