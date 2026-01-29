@@ -166,9 +166,9 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
       '[tabindex]:not([tabindex="-1"])',
     ].join(', ')
 
-    const getFocusableElements = () =>
+    const getFocusableElements = (): HTMLElement[] =>
       Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors)).filter(
-        (el) => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'),
+        (el: HTMLElement) => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'),
       )
 
     const focusFirstElement = () => {
@@ -228,7 +228,7 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
     >
       <div
         className="bp-modal-content bp-game-details-content"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="bp-game-details-title"
