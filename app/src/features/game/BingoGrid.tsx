@@ -4,6 +4,20 @@ import { getCuratedArticleTitle } from '../../shared/data/types'
 import { normalizeTitle } from '../../shared/wiki/normalizeTitle'
 import './BingoGrid.css'
 
+/**
+ * Adds soft hyphens to long words by splitting them in half.
+ * Only processes individual words (not spaces), and only words longer than 8 characters.
+ * This ensures words break at word boundaries first, and only break within words if they're too long.
+ */
+function addSoftHyphens(text: string): string {
+  // Match words (sequences of non-whitespace, non-punctuation characters)
+  // Only add hyphens to words longer than 8 characters
+  return text.replace(/\b(\w{9,})\b/g, (word) => {
+    const midPoint = Math.floor(word.length / 2)
+    return word.slice(0, midPoint) + '\u00AD' + word.slice(midPoint)
+  })
+}
+
 interface BingoGridProps {
   gridCells: GameGridCell[]
   matchedArticles: Set<string>
@@ -50,7 +64,8 @@ export function BingoGrid({ gridCells, matchedArticles, winningCells, onCellClic
       const isMatched = normalizedMatchedSet.has(normalizedTitle)
       const isWinning = winningSet.has(index as GridIndex)
       const displayTitle = title.replace(/_/g, ' ')
-      return { title, normalizedTitle, isMatched, isWinning, displayTitle, index }
+      const displayTitleWithHyphens = addSoftHyphens(displayTitle)
+      return { title, normalizedTitle, isMatched, isWinning, displayTitle, displayTitleWithHyphens, index }
     })
   }, [gridCells, normalizedMatchedSet, winningSet])
 
@@ -62,7 +77,7 @@ export function BingoGrid({ gridCells, matchedArticles, winningCells, onCellClic
         </button>
       )}
       <div className="bp-bingo-grid">
-        {cellData.map(({ title, isMatched, isWinning, displayTitle, index }) => {
+        {cellData.map(({ title, isMatched, isWinning, displayTitle, displayTitleWithHyphens, index }) => {
 
           return (
             <div
@@ -79,7 +94,7 @@ export function BingoGrid({ gridCells, matchedArticles, winningCells, onCellClic
                 }
               }}
             >
-              <div className="bp-bingo-cell-content">{displayTitle}</div>
+              <div className="bp-bingo-cell-content" lang="en">{displayTitleWithHyphens}</div>
             </div>
           )
         })}

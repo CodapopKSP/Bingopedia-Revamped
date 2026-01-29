@@ -112,9 +112,8 @@
   line-height: 1.2;
   text-align: center;
   color: var(--bingo-cell-text);
-  word-break: break-word;
+  word-break: normal;
   overflow-wrap: break-word;
-  hyphens: auto;
 }
 
 .bp-bingo-cell.matched .bp-bingo-cell-content {
