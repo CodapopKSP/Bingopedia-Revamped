@@ -165,18 +165,11 @@ function WinModalComponent({ clicks, time, gridCells, matchedArticles, articleHi
     }
   }
 
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !submitting) {
-        handleClose()
-      }
-    }
-    window.addEventListener('keydown', handleEscape)
-    return () => window.removeEventListener('keydown', handleEscape)
-  }, [submitting])
+  // Prevent closing with Escape key - user must explicitly close via button
+  // Removed Escape key handler to prevent accidental dismissal
 
   return (
-    <div className="bp-modal-overlay bp-win-modal-overlay" onClick={handleClose}>
+    <div className="bp-modal-overlay bp-win-modal-overlay">
       <div className="bp-modal-content bp-win-modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="bp-modal-header">
           <h3 className="bp-modal-title">🎉 Congratulations! You Won! 🎉</h3>

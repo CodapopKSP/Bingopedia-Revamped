@@ -690,10 +690,12 @@ function ArticleViewerComponent({
     const normalized = normalizeTitle(articleTitle)
     const articleChanged = previousArticleTitleRef.current !== normalized && previousArticleTitleRef.current !== null
     
-    // If reloadKey changed, clear cache for this article to force fresh load
+    // If reloadKey changed, clear cache and content for this article to force fresh load
     if (reloadKey > 0) {
       tocCacheRef.current.delete(normalized)
       currentLoadingTitleRef.current = null
+      setContent('')
+      setTocItems([])
     }
 
     // Clear ToC and close modal when article changes
@@ -726,7 +728,8 @@ function ArticleViewerComponent({
      */
     const loadArticle = async (attemptNumber: number = 0) => {
       // Prevent duplicate loads of the same article on first attempt
-      if (currentLoadingTitleRef.current === normalized && attemptNumber === 0) {
+      // Skip this check if we're reloading (reloadKey > 0)
+      if (currentLoadingTitleRef.current === normalized && attemptNumber === 0 && reloadKey === 0) {
         return
       }
 
@@ -756,7 +759,18 @@ function ArticleViewerComponent({
 
       try {
         const result = await fetchWikipediaArticle(articleTitle)
-        const processed = processHtmlLinks(result.html)
+        
+        // Process HTML links - wrap in try-catch to handle processing errors gracefully
+        let processed: string
+        try {
+          processed = processHtmlLinks(result.html)
+        } catch (processError) {
+          // If HTML processing fails, use the original HTML
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[ArticleViewer] HTML processing failed, using original HTML:', processError)
+          }
+          processed = result.html
+        }
         
         // Extract ToC immediately during HTML processing (not in separate useEffect)
         // Check cache first to avoid re-extraction
@@ -770,11 +784,21 @@ function ArticleViewerComponent({
           // Extract from raw HTML (before sanitization) for better accuracy
           // The sanitized HTML may not include the ToC container
           // Use rawHtml if available, otherwise fall back to sanitized HTML
-          const htmlForExtraction = result.rawHtml || result.html
-          // Pass article title for better logging in development mode
-          extractedToc = extractTableOfContents(htmlForExtraction, articleTitle)
-          // Cache the result
-          tocCacheRef.current.set(normalizedTitle, extractedToc)
+          // Wrap in try-catch to ensure ToC extraction failures don't prevent article loading
+          try {
+            const htmlForExtraction = result.rawHtml || result.html
+            // Pass article title for better logging in development mode
+            extractedToc = extractTableOfContents(htmlForExtraction, articleTitle)
+            // Cache the result
+            tocCacheRef.current.set(normalizedTitle, extractedToc)
+          } catch (tocError) {
+            // ToC extraction failed, but article should still load
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('[ArticleViewer] ToC extraction failed, but continuing with article load:', tocError)
+            }
+            // extractedToc remains empty array, which is fine
+            // Don't cache empty result in case it's a transient error
+          }
         }
         
         // Verify we're still loading the same article (prevent race conditions)
@@ -824,11 +848,21 @@ function ArticleViewerComponent({
         setRetryCount(0)
         setIsRetrying(false)
         setLoading(false)
+        // Reset reload key after successful reload
+        if (reloadKey > 0) {
+          setReloadKey(0)
+        }
         if (currentLoadingTitleRef.current === normalized) {
           currentLoadingTitleRef.current = null
         }
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load article'
+        const errorMessage = err instanceof Error 
+          ? `${err.message}${err.stack ? `\n${err.stack}` : ''}` 
+          : `Failed to load article: ${String(err)}`
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.error(`[ArticleViewer] Failed to load article "${articleTitle}" (attempt ${attemptNumber + 1}/${MAX_RETRIES + 1}):`, err)
+        }
         
         // Check if we should retry
         if (attemptNumber < MAX_RETRIES) {
@@ -1136,8 +1170,13 @@ function ArticleViewerComponent({
       retryTimeoutRef.current = null
     }
     
-    // Reset error state
+    // Clear content and error state to force reload
+    setContent('')
     setError(null)
+    setTocItems([])
+    
+    // Reset previous article title ref so useEffect treats it as a new article
+    previousArticleTitleRef.current = null
     
     // Increment reload key to trigger useEffect reload
     setReloadKey((prev) => prev + 1)
@@ -1707,6 +1746,24 @@ function ArticleViewerComponent({
           {!loading && !error && content && (
             <div className="bp-article-body" dangerouslySetInnerHTML={{ __html: content }} />
           )}
+          {/* Reload button at the bottom of article content */}
+          <div className="bp-article-reload-container">
+            <button
+              type="button"
+              className="bp-article-reload-button"
+              onClick={handleReload}
+              disabled={!articleTitle || loading}
+              aria-label="Reload article"
+              title="Reload article from scratch"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              <span>Reload Article</span>
+            </button>
+          </div>
         </div>
       </div>
       {showConfirmModal && (
@@ -1780,24 +1837,6 @@ function ArticleViewerComponent({
           </div>
         </div>
       )}
-      {/* Reload button at the bottom */}
-      <div className="bp-article-reload-container">
-        <button
-          type="button"
-          className="bp-article-reload-button"
-          onClick={handleReload}
-          disabled={!articleTitle || loading}
-          aria-label="Reload article"
-          title="Reload article from scratch"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <polyline points="1 20 1 14 7 14"></polyline>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-          </svg>
-          <span>Reload Article</span>
-        </button>
-      </div>
     </div>
   )
 }

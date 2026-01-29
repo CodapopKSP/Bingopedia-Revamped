@@ -1126,9 +1126,10 @@
 
 /* Reload button container */
 .bp-article-reload-container {
-  padding: 0.75rem 1rem;
+  padding: 1rem;
+  margin-top: 2rem;
   border-top: 1px solid var(--border-primary);
-  background: var(--bg-input);
+  background: transparent;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1178,7 +1179,8 @@
 /* Mobile optimizations for reload button */
 @media (max-width: 768px) {
   .bp-article-reload-container {
-    padding: 0.5rem;
+    padding: 0.75rem 0.5rem;
+    margin-top: 1.5rem;
   }
   
   .bp-article-reload-button {
