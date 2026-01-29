@@ -12,6 +12,12 @@
   border: 1px solid var(--border-primary, #ddd);
 }
 
+/* When inside inline container, remove sticky positioning */
+.bp-toc-inline .bp-toc {
+  position: static;
+  top: auto;
+}
+
 .bp-toc-header {
   margin-bottom: 0.5rem;
 }

@@ -1632,6 +1632,22 @@ function ArticleViewerComponent({
         )}
       </div>
       <div className="bp-article-layout">
+        {/* Desktop: Inline Table of Contents */}
+        {showToc && !loading && content && (
+          <div className="bp-toc-inline">
+            <div className="bp-toc-inline-header">
+              <h3>Table of Contents</h3>
+              <button 
+                className="bp-toc-inline-close" 
+                onClick={() => setShowToc(false)} 
+                aria-label="Close Table of Contents"
+              >
+                ✕
+              </button>
+            </div>
+            <TableOfContents items={tocItems} onNavigate={handleTocNavigate} hideHeader={true} />
+          </div>
+        )}
         <div className="bp-article-content" ref={contentRef}>
           {loading && (
             <div className="bp-article-loading">
@@ -1691,10 +1707,10 @@ function ArticleViewerComponent({
           </div>
         </div>
       )}
-      {/* Table of Contents Modal/Overlay */}
+      {/* Table of Contents Modal/Overlay - Mobile only */}
       {showToc && (
         <div 
-          className="bp-modal-overlay bp-toc-overlay" 
+          className="bp-modal-overlay bp-toc-overlay bp-toc-overlay-mobile" 
           onClick={() => setShowToc(false)}
           role="dialog"
           aria-modal="true"

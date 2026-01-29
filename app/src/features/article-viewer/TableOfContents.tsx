@@ -14,6 +14,7 @@ export interface ToCItem {
 interface TableOfContentsProps {
   items: ToCItem[]
   onNavigate?: (sectionId: string) => void
+  hideHeader?: boolean
 }
 
 /**
@@ -27,7 +28,7 @@ interface TableOfContentsProps {
  * @param props.items - Array of ToC items to display
  * @param props.onNavigate - Optional callback when a section is clicked
  */
-export const TableOfContents = memo(({ items, onNavigate }: TableOfContentsProps) => {
+export const TableOfContents = memo(({ items, onNavigate, hideHeader = false }: TableOfContentsProps) => {
   /**
    * Handles clicking a ToC item.
    * Prevents default anchor behavior and calls the navigation callback.
@@ -62,9 +63,11 @@ export const TableOfContents = memo(({ items, onNavigate }: TableOfContentsProps
 
   return (
     <nav className="bp-toc" aria-label="Table of Contents">
-      <div className="bp-toc-header">
-        <h3>Contents</h3>
-      </div>
+      {!hideHeader && (
+        <div className="bp-toc-header">
+          <h3>Contents</h3>
+        </div>
+      )}
       {items.length === 0 ? (
         <div className="bp-toc-empty">
           <p>No table of contents available for this article.</p>
