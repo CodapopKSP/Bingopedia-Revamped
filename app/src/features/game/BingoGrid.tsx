@@ -1,8 +1,79 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useEffect, useState } from 'react'
 import type { GameGridCell, GridIndex } from './types'
 import { getCuratedArticleTitle } from '../../shared/data/types'
 import { normalizeTitle } from '../../shared/wiki/normalizeTitle'
 import './BingoGrid.css'
+
+/**
+ * Bingo cell component that centers text vertically unless it exceeds 4 lines.
+ */
+function BingoCell({
+  title,
+  displayTitle,
+  displayTitleWithHyphens,
+  isMatched,
+  isWinning,
+  onCellClick,
+}: {
+  title: string
+  displayTitle: string
+  displayTitleWithHyphens: string
+  isMatched: boolean
+  isWinning: boolean
+  onCellClick: (title: string) => void
+}) {
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [isTall, setIsTall] = useState(false)
+
+  useEffect(() => {
+    if (!contentRef.current) return
+
+    // Calculate 4 lines height: font-size (0.875rem) * line-height (1.2) * 4
+    // Convert rem to pixels: 0.875rem ≈ 14px, so 14 * 1.2 * 4 = 67.2px
+    const fourLinesHeight = parseFloat(getComputedStyle(contentRef.current).fontSize) * 1.2 * 4
+    
+    const checkHeight = () => {
+      if (contentRef.current) {
+        const height = contentRef.current.scrollHeight
+        setIsTall(height > fourLinesHeight)
+      }
+    }
+
+    // Check after a brief delay to ensure content is rendered
+    const timeoutId = setTimeout(checkHeight, 0)
+    
+    // Also check on resize
+    const resizeObserver = new ResizeObserver(checkHeight)
+    if (contentRef.current) {
+      resizeObserver.observe(contentRef.current)
+    }
+
+    return () => {
+      clearTimeout(timeoutId)
+      resizeObserver.disconnect()
+    }
+  }, [displayTitleWithHyphens])
+
+  return (
+    <div
+      className={`bp-bingo-cell ${isWinning ? 'winning' : isMatched ? 'matched' : ''} ${isTall ? 'bp-bingo-cell--tall' : ''}`}
+      onClick={() => onCellClick(title)}
+      role="button"
+      tabIndex={0}
+      aria-label={`Bingo cell: ${displayTitle}${isMatched ? ' (matched)' : ''}${isWinning ? ' (winning)' : ''}`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onCellClick(title)
+        }
+      }}
+    >
+      <div ref={contentRef} className="bp-bingo-cell-content" lang="en">
+        {displayTitleWithHyphens}
+      </div>
+    </div>
+  )
+}
 
 /**
  * Adds soft hyphens to long words by splitting them in half.
@@ -77,27 +148,17 @@ export function BingoGrid({ gridCells, matchedArticles, winningCells, onCellClic
         </button>
       )}
       <div className="bp-bingo-grid">
-        {cellData.map(({ title, isMatched, isWinning, displayTitle, displayTitleWithHyphens, index }) => {
-
-          return (
-            <div
-              key={gridCells[index].id}
-              className={`bp-bingo-cell ${isWinning ? 'winning' : isMatched ? 'matched' : ''}`}
-              onClick={() => onCellClick(title)}
-              role="button"
-              tabIndex={0}
-              aria-label={`Bingo cell: ${displayTitle}${isMatched ? ' (matched)' : ''}${isWinning ? ' (winning)' : ''}`}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  onCellClick(title)
-                }
-              }}
-            >
-              <div className="bp-bingo-cell-content" lang="en">{displayTitleWithHyphens}</div>
-            </div>
-          )
-        })}
+        {cellData.map(({ title, isMatched, isWinning, displayTitle, displayTitleWithHyphens, index }) => (
+          <BingoCell
+            key={gridCells[index].id}
+            title={title}
+            displayTitle={displayTitle}
+            displayTitleWithHyphens={displayTitleWithHyphens}
+            isMatched={isMatched}
+            isWinning={isWinning}
+            onCellClick={onCellClick}
+          />
+        ))}
       </div>
     </div>
   )
