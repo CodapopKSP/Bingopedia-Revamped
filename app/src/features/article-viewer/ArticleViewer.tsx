@@ -1600,43 +1600,36 @@ function ArticleViewerComponent({
   return (
     <div className="bp-article-viewer">
       <div className="bp-article-header">
+        <button
+          type="button"
+          className="bp-toc-toggle-button"
+          onClick={handleTocToggle}
+          disabled={loading || !content}
+          aria-label="Open Table of Contents"
+          title={loading || !content ? "Table of Contents (loading...)" : "Table of Contents"}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+          <span>Table of Contents</span>
+        </button>
         <h2 className="bp-article-title">{displayTitle}</h2>
-        <div className="bp-article-header-actions">
+        {articleTitle && (
           <button
             type="button"
-            className="bp-toc-toggle-button"
-            onClick={handleTocToggle}
-            disabled={loading || !content}
-            aria-label="Open Table of Contents"
-            title={loading || !content ? "Table of Contents (loading...)" : "Table of Contents"}
+            className="bp-view-wikipedia-link"
+            onClick={handleViewOnWikipedia}
+            aria-label="View this article on Wikipedia"
+            title="View on Wikipedia"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="8" y1="6" x2="21" y2="6"></line>
-              <line x1="8" y1="12" x2="21" y2="12"></line>
-              <line x1="8" y1="18" x2="21" y2="18"></line>
-              <line x1="3" y1="6" x2="3.01" y2="6"></line>
-              <line x1="3" y1="12" x2="3.01" y2="12"></line>
-              <line x1="3" y1="18" x2="3.01" y2="18"></line>
-            </svg>
-            <span>Table of Contents</span>
+            View on Wiki
           </button>
-          {articleTitle && (
-            <button
-              type="button"
-              className="bp-view-wikipedia-button"
-              onClick={handleViewOnWikipedia}
-              aria-label="View this article on Wikipedia"
-              title="View on Wikipedia"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                <polyline points="15 3 21 3 21 9"></polyline>
-                <line x1="10" y1="14" x2="21" y2="3"></line>
-              </svg>
-              View on Wikipedia
-            </button>
-          )}
-        </div>
+        )}
       </div>
       <div className="bp-article-layout">
         <div className="bp-article-content" ref={contentRef}>
