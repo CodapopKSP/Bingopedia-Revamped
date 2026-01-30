@@ -31,6 +31,26 @@ function formatBingoSquares(gridCells: GameGridCell[]): string[] {
   return gridCells.map((cell) => getCuratedArticleTitle(cell.article))
 }
 
+/**
+ * Replaces spaces with underscores in article titles.
+ * Used when saving history to the leaderboard.
+ * 
+ * @param title - Article title (may include "[Found] " prefix)
+ * @returns Title with spaces replaced by underscores
+ */
+function replaceSpacesWithUnderscores(title: string): string {
+  if (!title) return title
+  
+  // If title starts with "[Found] ", replace spaces only in the article title part
+  if (title.startsWith('[Found] ')) {
+    const articleTitle = title.replace('[Found] ', '')
+    return `[Found] ${articleTitle.replace(/\s+/g, '_')}`
+  }
+  
+  // Otherwise, replace all spaces in the title
+  return title.replace(/\s+/g, '_')
+}
+
 async function addFoundTagsToHistory(history: string[], bingoSquares: string[]): Promise<string[]> {
   const normalizedBoardTitles = new Set(bingoSquares.map((title) => normalizeTitle(title)))
   const normalizedBoardRedirects = new Set<string>()
@@ -59,18 +79,18 @@ async function addFoundTagsToHistory(history: string[], bingoSquares: string[]):
       normalizedBoardRedirects.has(normalizedResolved)
 
     if (!isBoardMatch) {
-      taggedHistory.push(title)
+      taggedHistory.push(replaceSpacesWithUnderscores(title))
       continue
     }
 
     const dedupeKey = normalizedResolved || normalized
     if (seen.has(dedupeKey)) {
-      taggedHistory.push(title)
+      taggedHistory.push(replaceSpacesWithUnderscores(title))
       continue
     }
 
     seen.add(dedupeKey)
-    taggedHistory.push(`[Found] ${title}`)
+    taggedHistory.push(replaceSpacesWithUnderscores(`[Found] ${title}`))
   }
 
   return taggedHistory

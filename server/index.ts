@@ -24,6 +24,26 @@ function generateLink(): string {
   return randomBytes(12).toString('base64url').substring(0, 16);
 }
 
+/**
+ * Replaces spaces with underscores in article titles.
+ * Used when saving history to the leaderboard.
+ * 
+ * @param title - Article title (may include "[Found] " prefix)
+ * @returns Title with spaces replaced by underscores
+ */
+function replaceSpacesWithUnderscores(title: string): string {
+  if (!title) return title;
+  
+  // If title starts with "[Found] ", replace spaces only in the article title part
+  if (title.startsWith('[Found] ')) {
+    const articleTitle = title.replace('[Found] ', '');
+    return `[Found] ${articleTitle.replace(/\s+/g, '_')}`;
+  }
+  
+  // Otherwise, replace all spaces in the title
+  return title.replace(/\s+/g, '_');
+}
+
 app.get('/api/leaderboard', async (req, res) => {
   try {
     // Disable caching for leaderboard API to ensure filters work correctly
@@ -205,7 +225,7 @@ app.post('/api/leaderboard', async (req, res) => {
       ...(shouldIncludeBingopediaGame
         ? { bingopediaGame: bingopediaGame.map(String) }
         : {}),
-      history: Array.isArray(history) ? history.map(String) : [],
+      history: Array.isArray(history) ? history.map((title) => replaceSpacesWithUnderscores(String(title))) : [],
       createdAt: new Date(),
       ...(gameId && { gameId: String(gameId) }),
       gameType: validGameType,

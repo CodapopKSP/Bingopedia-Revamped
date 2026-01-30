@@ -22,6 +22,26 @@ function generateHashedId(): string {
   return bytes.toString('base64url').substring(0, 16);
 }
 
+/**
+ * Replaces spaces with underscores in article titles.
+ * Used when saving history to the leaderboard.
+ * 
+ * @param title - Article title (may include "[Found] " prefix)
+ * @returns Title with spaces replaced by underscores
+ */
+function replaceSpacesWithUnderscores(title: string): string {
+  if (!title) return title;
+  
+  // If title starts with "[Found] ", replace spaces only in the article title part
+  if (title.startsWith('[Found] ')) {
+    const articleTitle = title.replace('[Found] ', '');
+    return `[Found] ${articleTitle.replace(/\s+/g, '_')}`;
+  }
+  
+  // Otherwise, replace all spaces in the title
+  return title.replace(/\s+/g, '_');
+}
+
 type SortField = 'score' | 'clicks' | 'time' | 'createdAt' | 'username';
 type SortOrder = 'asc' | 'desc';
 
@@ -357,7 +377,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ...(shouldIncludeBingopediaGame
           ? { bingopediaGame: bingopediaGame.map(String) }
           : {}),
-        history: Array.isArray(history) ? history.map(String) : [],
+        history: Array.isArray(history) ? history.map((title) => replaceSpacesWithUnderscores(String(title))) : [],
         createdAt: new Date(),
         gameType: validGameType,
         generatedGame: finalGeneratedGame,
