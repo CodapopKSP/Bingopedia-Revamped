@@ -1,20 +1,23 @@
 .bp-game-details-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
   background: var(--overlay-modal);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   z-index: 2000;
   padding: 1rem;
+  backdrop-filter: blur(8px);
 }
 
 .bp-game-details-content {
-  background: var(--bg-input);
-  border-radius: 0.75rem;
+  background: var(--bg-modal);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-secondary);
+  border-radius: 1.25rem;
   max-width: 720px;
   width: 90%;
   /* Increased height for larger screens: taller to prevent bottom row cutoff */
@@ -23,7 +26,7 @@
   min-height: 830px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
   /* Ensure stable frame size */
   overflow: hidden;
 }
@@ -75,6 +78,7 @@
   color: var(--text-muted);
   cursor: pointer;
   font-size: 0.9rem;
+  font-weight: 700;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   transition: color 0.2s ease;
@@ -220,21 +224,23 @@
 
 .bp-replay-button {
   padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   border: none;
-  background: linear-gradient(135deg, var(--button-blue-bg), var(--button-blue-hover));
+  background: var(--button-blue-bg);
   color: var(--button-blue-text);
   font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
   transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
 }
 
 .bp-replay-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
-  filter: brightness(1.05);
+  background: var(--button-blue-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
 }
 
 .bp-replay-button:active:not(:disabled) {

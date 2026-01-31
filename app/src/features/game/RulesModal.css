@@ -1,10 +1,30 @@
 .bp-rules-modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background: var(--overlay-modal);
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   z-index: 1001; /* Above other modals */
+  backdrop-filter: blur(8px);
+  padding: 1rem;
 }
 
 .bp-rules-modal-content {
+  background: var(--bg-modal);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-secondary);
+  border-radius: 1.25rem;
   max-width: 700px;
+  width: 90%;
   max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
 }
 
 .bp-rules-modal-body {
@@ -22,8 +42,9 @@
 
 .bp-rules-section-title {
   margin: 0 0 0.75rem;
-  font-size: 1.125rem;
-  font-weight: 600;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-accent);
 }
 
@@ -59,10 +80,12 @@
 
 .bp-rules-example {
   background: var(--bg-panel);
+  backdrop-filter: blur(8px);
   border: 1px solid var(--border-secondary);
-  border-radius: 0.5rem;
-  padding: 1.25rem;
+  border-radius: 1rem;
+  padding: 1.5rem;
   margin-top: 0.75rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
 
 .bp-rules-example .bp-rules-text {

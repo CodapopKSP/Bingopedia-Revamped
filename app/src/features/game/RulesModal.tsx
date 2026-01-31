@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import './RulesModal.css'
 
 interface RulesModalProps {
@@ -31,7 +32,7 @@ export function RulesModal({ onClose }: RulesModalProps) {
     }
   }
 
-  return (
+  const modalContent = (
     <div
       className="bp-modal-overlay bp-rules-modal-overlay"
       onClick={handleOverlayClick}
@@ -129,5 +130,7 @@ export function RulesModal({ onClose }: RulesModalProps) {
       </div>
     </div>
   )
+
+  return createPortal(modalContent, document.body)
 }
 

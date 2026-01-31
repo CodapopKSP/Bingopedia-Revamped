@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import type { LeaderboardEntry, GameGridCell } from '../game/types'
 import { BingoGrid } from '../game/BingoGrid'
 import { HistoryPanel } from '../game/HistoryPanel'
@@ -220,7 +221,7 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
     }
   }, [handleClose])
 
-  return (
+  const modalContent = (
     <div
       className="bp-modal-overlay bp-game-details-overlay"
       onClick={handleClose}
@@ -340,5 +341,7 @@ export function GameDetailsModal({ entry, onClose, onReplay }: GameDetailsModalP
       )}
     </div>
   )
+
+  return createPortal(modalContent, document.body)
 }
 

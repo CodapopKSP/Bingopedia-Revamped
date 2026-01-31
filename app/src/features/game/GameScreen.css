@@ -61,9 +61,12 @@
 }
 
 .bp-game-status {
-  padding: 0.15rem 0.6rem;
-  border-radius: 999px;
-  border: 1px solid var(--border-hover);
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  border: 1.5px solid var(--border-hover);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-weight: 600;
 }
 
 .bp-game-status--won {
@@ -122,24 +125,32 @@
   position: fixed;
   bottom: 1.5rem;
   right: 1.5rem;
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   background: var(--button-blue-bg);
   color: var(--button-blue-text);
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4), 0 0 0 0 rgba(59, 130, 246, 0);
   z-index: 1001;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   align-items: center;
   justify-content: center;
   padding: 0;
+  backdrop-filter: blur(10px);
+}
+
+.bp-bingo-board-toggle:hover {
+  background: var(--button-blue-hover);
+  transform: scale(1.1) translateY(-2px);
+  box-shadow: 0 12px 32px rgba(59, 130, 246, 0.5), 0 0 0 4px rgba(59, 130, 246, 0.1);
 }
 
 .bp-bingo-board-toggle:active {
-  transform: scale(0.95);
+  transform: scale(0.95) translateY(0);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
 }
 
 .bp-globe-icon {
@@ -187,7 +198,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(180deg, var(--bg-input) 0%, var(--bg-panel) 100%);
+    background: var(--bg-panel);
     z-index: 999;
     padding: 1rem;
     padding-top: calc(3.5rem + 1rem); /* Space for fixed scorebar (3.5rem) + margin (1rem) */

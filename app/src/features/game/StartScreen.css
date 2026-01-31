@@ -21,10 +21,11 @@
 }
 
 .bp-start-hero {
-  padding: 1.5rem;
-  border-radius: 1rem;
-  background: radial-gradient(circle at top left, var(--color-blue-accent-rgba), var(--bg-card));
-  box-shadow: 0 24px 60px var(--bg-card);
+  padding: 2rem;
+  border-radius: 1.5rem;
+  background: var(--bg-card);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-hover);
   max-width: 100%;
   width: 100%;
   box-sizing: border-box;
@@ -41,7 +42,10 @@
 
 .bp-start-hero h2 {
   margin: 0 0 0.75rem;
-  font-size: 1.75rem;
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
 }
 
 @media (max-width: 600px) {
@@ -83,26 +87,31 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.75rem 1.75rem;
-  border-radius: 999px;
+  padding: 0.875rem 2rem;
+  border-radius: 9999px;
   border: none;
   font-weight: 600;
   font-size: 1rem;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  background: linear-gradient(135deg, var(--button-primary-bg), var(--color-yellow-accent));
+  background: var(--button-primary-bg);
   color: var(--button-primary-text);
-  transition: transform 0.1s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .bp-start-button:hover {
+  background: var(--button-primary-hover);
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .bp-start-button:active {
   transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .bp-start-actions {
@@ -123,23 +132,28 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.75rem 1.75rem;
-  border-radius: 999px;
-  border: 1px solid var(--border-hover);
+  padding: 0.875rem 2rem;
+  border-radius: 9999px;
+  border: 2px solid var(--border-hover);
   font-weight: 600;
   font-size: 1rem;
+  letter-spacing: 0.01em;
   cursor: pointer;
   background: var(--bg-panel);
+  backdrop-filter: blur(10px);
   color: var(--text-primary);
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .bp-share-button:hover:not(:disabled) {
   background: var(--bg-card);
   border-color: var(--border-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .bp-share-button:disabled {
@@ -153,7 +167,7 @@
   justify-content: center;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  border: 1px solid var(--border-secondary);
+  border: 2px solid var(--border-hover);
   font-weight: 500;
   font-size: 0.875rem;
   cursor: pointer;
@@ -185,13 +199,15 @@
 
 .bp-shareable-link-container {
   margin-top: 1.5rem;
-  padding: 1rem;
+  padding: 1.25rem;
   background: var(--bg-panel);
-  border-radius: 0.5rem;
+  backdrop-filter: blur(10px);
+  border-radius: 1rem;
   border: 1px solid var(--border-secondary);
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
 
 .bp-shareable-link-label {
@@ -212,13 +228,19 @@
 .bp-shareable-link-input {
   flex: 1;
   min-width: 0;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.375rem;
-  border: 1px solid var(--border-hover);
+  padding: 0.625rem 1rem;
+  border-radius: 0.75rem;
+  border: 1.5px solid var(--border-secondary);
   background: var(--bg-card);
   color: var(--text-primary);
   font-size: 0.875rem;
   box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.bp-shareable-link-input:focus {
+  border-color: var(--border-hover);
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.1);
 }
 
 .bp-shareable-link-input:focus {
@@ -228,20 +250,23 @@
 }
 
 .bp-copy-button {
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
-  border: 1px solid var(--border-hover);
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.75rem;
+  border: none;
   background: var(--button-blue-bg);
   color: var(--button-blue-text);
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 .bp-copy-button:hover {
   background: var(--button-blue-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
 }
 
 .bp-copy-button:active {
