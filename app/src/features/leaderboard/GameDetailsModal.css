@@ -251,20 +251,20 @@
   font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 2px 8px rgba(167, 139, 250, 0.3);
   transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 12px rgba(167, 139, 250, 0.4);
 }
 
 .bp-replay-button:hover:not(:disabled) {
   background: var(--button-blue-hover);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+  box-shadow: 0 6px 20px rgba(167, 139, 250, 0.5);
 }
 
 .bp-replay-button:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 2px 8px rgba(167, 139, 250, 0.3);
 }
 
 .bp-replay-button:disabled {

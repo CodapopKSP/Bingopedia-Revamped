@@ -85,13 +85,13 @@
   background: var(--button-blue-bg);
   border-color: var(--button-blue-bg);
   color: var(--button-blue-text);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 2px 8px rgba(167, 139, 250, 0.3);
 }
 
 .bp-error-boundary-button--primary:hover {
   background: var(--button-blue-hover);
   border-color: var(--button-blue-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 12px rgba(167, 139, 250, 0.4);
 }
 

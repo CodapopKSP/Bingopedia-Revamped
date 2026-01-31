@@ -61,11 +61,11 @@
   --button-secondary-text: #f0f0f0;
   --button-secondary-border: rgba(255, 255, 255, 0.2);
   
-  --button-blue-bg: #3b82f6;
-  --button-blue-bg-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  --button-blue-bg: #a78bfa;
+  --button-blue-bg-gradient: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
   --button-blue-text: white;
-  --button-blue-hover: #60a5fa;
-  --button-blue-hover-gradient: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  --button-blue-hover: #c4b5fd;
+  --button-blue-hover-gradient: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%);
   
   /* Link Colors - Cyan accent */
   --link-color: #22d3ee;
@@ -180,11 +180,11 @@
   --button-secondary-text: #1e1b4b;
   --button-secondary-border: rgba(167, 139, 250, 0.4);
   
-  --button-blue-bg: #3b82f6;
-  --button-blue-bg-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  --button-blue-bg: #8b5cf6;
+  --button-blue-bg-gradient: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
   --button-blue-text: white;
-  --button-blue-hover: #60a5fa;
-  --button-blue-hover-gradient: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  --button-blue-hover: #a78bfa;
+  --button-blue-hover-gradient: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
   
   /* Link Colors */
   --link-color: #2563eb;

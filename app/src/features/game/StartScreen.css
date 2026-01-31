@@ -5,6 +5,7 @@
   width: 100%;
   box-sizing: border-box;
   overflow-x: hidden;
+  min-height: fit-content; /* Allow grid to extend to fit content */
 }
 
 @media (max-width: 600px) {
@@ -30,6 +31,7 @@
   width: 100%;
   box-sizing: border-box;
   overflow-x: hidden;
+  overflow-y: visible; /* Allow content to extend naturally */
   overflow-wrap: break-word;
   word-wrap: break-word;
 }
@@ -260,13 +262,13 @@
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 2px 8px rgba(167, 139, 250, 0.3);
 }
 
 .bp-copy-button:hover {
   background: var(--button-blue-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 12px rgba(167, 139, 250, 0.4);
 }
 
 .bp-copy-button:active {

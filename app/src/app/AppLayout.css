@@ -11,6 +11,15 @@
   width: 100%;
 }
 
+@media (max-width: 768px) {
+  .bp-app-root {
+    min-height: 100vh; /* Allow root to grow beyond viewport on mobile */
+    height: auto; /* Remove fixed height constraint on mobile */
+    overflow-y: visible; /* Allow vertical overflow on mobile */
+    overflow-x: hidden;
+  }
+}
+
 .bp-app-header {
   padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--border-secondary);
@@ -64,6 +73,11 @@
 @media (max-width: 768px) {
   .bp-app-main {
     padding: 0.75rem 0;
+    overflow-y: visible; /* Allow content to extend naturally on mobile */
+    overflow-x: hidden;
+    max-height: none; /* Remove height constraint on mobile to allow content to extend */
+    min-height: auto; /* Allow content to determine minimum height */
+    flex: none; /* Remove flex constraint to allow natural height */
   }
 }
 
