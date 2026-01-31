@@ -39,7 +39,13 @@ export function GameScreen({ state, controls, onBackToStart, onMatchCallbackRead
   const [showWinModal, setShowWinModal] = useState(false)
   const [showWinConfetti, setShowWinConfetti] = useState(false)
   const [showMatchConfetti, setShowMatchConfetti] = useState(false)
-  const [bingoBoardOpen, setBingoBoardOpen] = useState(false)
+  // On mobile (screens < 960px), show bingo board by default
+  const [bingoBoardOpen, setBingoBoardOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 960
+    }
+    return false
+  })
 
   useEffect(() => {
     if (gameWon && !showWinModal && !showWinConfetti) {
