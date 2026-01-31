@@ -1106,12 +1106,12 @@
   .bp-toc-modal-content {
     max-width: 100%;
     width: 100%;
-    max-height: calc(50vh - 80px);
+    max-height: calc(80vh - 80px);
     margin: 1rem;
   }
   
   .bp-toc-modal-body {
-    max-height: calc(50vh - 200px);
+    max-height: calc(80vh - 200px);
     padding-bottom: 1rem;
   }
   

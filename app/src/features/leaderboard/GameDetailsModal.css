@@ -1,15 +1,16 @@
 .bp-game-details-overlay {
   position: fixed !important;
-  top: 0 !important;
+  top: 63px !important; /* Start below AppLayout header */
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
   background: var(--overlay-modal);
   display: flex !important;
-  align-items: center !important;
+  align-items: flex-start !important; /* Align content to top */
   justify-content: center !important;
   z-index: 2000;
   padding: 1rem;
+  padding-top: 0.5rem; /* Small gap below header */
   backdrop-filter: blur(8px);
 }
 
@@ -21,7 +22,8 @@
   max-width: 720px;
   width: 90%;
   /* Increased height for larger screens: taller to prevent bottom row cutoff */
-  max-height: min(97vh, 1050px);
+  /* Account for header (63px) and padding (0.5rem top + 1rem bottom = ~24px) */
+  max-height: min(calc(97vh - 63px - 1.5rem), calc(1050px - 63px));
   /* Increased min-height: taller to accommodate full grid */
   min-height: 830px;
   display: flex;
@@ -99,7 +101,8 @@
   padding: 0.75rem; /* Reduced padding to give more space to grid */
   min-height: 500px;
   /* Adjusted for new modal height: increased to prevent cutoff on larger screens */
-  max-height: calc(95vh - 180px); /* Even more reduced subtraction to ensure bottom row is visible */
+  /* Account for header (63px) and modal internal elements (stats, tabs, etc. ~180px) */
+  max-height: calc(95vh - 63px - 180px); /* Even more reduced subtraction to ensure bottom row is visible */
   display: flex;
   flex-direction: column;
   /* Stable container that doesn't change size when content switches */
@@ -271,13 +274,14 @@
 
 @media (max-width: 768px) {
   .bp-game-details-overlay {
+    top: 63px !important; /* Start below AppLayout header */
     padding: 0.5rem 0.125rem 0.125rem; /* Top padding to ensure close button is visible */
     align-items: flex-start !important; /* Align to top to prevent modal from going above viewport */
     overflow-y: auto; /* Allow scrolling if modal is taller than viewport */
   }
   
   .bp-game-details-content {
-    max-height: calc(100vh - 1rem); /* Account for top padding, ensure it never exceeds viewport */
+    max-height: calc(100vh - 63px - 1rem); /* Account for header (63px) and top padding, ensure it never exceeds viewport */
     margin: 0;
     margin-top: 0; /* Ensure no top margin pushes it above viewport */
     width: 100%; /* Use full width */
