@@ -21,17 +21,29 @@
     margin: 0;
     padding: 0;
     border-radius: 0;
+    /* Maintain height constraint on mobile so content scrolls internally */
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
   
   .bp-article-content {
     width: 100%;
     padding: 0.25rem 0;
     min-width: 0;
+    /* Ensure article content is scrollable on mobile */
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
   }
   
   .bp-article-layout {
     width: 100%;
     min-width: 0;
+    /* Maintain flex layout for proper scrolling */
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
   
   .bp-article-body {
@@ -51,6 +63,8 @@
     box-sizing: border-box;
     border-left: none;
     border-right: none;
+    /* Ensure header doesn't scroll with content */
+    flex-shrink: 0;
   }
 }
 
@@ -705,9 +719,6 @@
   margin-bottom: 0.3em;
 }
 
-.bp-article-body .mw-parser-output {
-  /* Main content wrapper */
-}
 
 /* Wikipedia-style navigation boxes */
 .bp-article-body .navbox {
