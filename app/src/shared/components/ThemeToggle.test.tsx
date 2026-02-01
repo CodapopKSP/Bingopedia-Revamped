@@ -68,7 +68,7 @@ describe('ThemeToggle', () => {
     await user.click(button)
 
     expect(button).toHaveAttribute('aria-label', 'Switch to dark mode')
-    expect(localStorageMock.getItem('bingopedia-theme')).toBe('light')
+    expect(localStorageMock.getItem('wikibingo-theme')).toBe('light')
   })
 
   it('should toggle theme on Enter key', async () => {
@@ -121,7 +121,7 @@ describe('ThemeToggle', () => {
   })
 
   it('should display correct icon for dark theme', () => {
-    localStorageMock.setItem('bingopedia-theme', 'dark')
+    localStorageMock.setItem('wikibingo-theme', 'dark')
 
     render(
       <ThemeProvider>

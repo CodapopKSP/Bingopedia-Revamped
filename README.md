@@ -1,4 +1,4 @@
-# Bingopedia
+# Wikibingo
 
 A Wikipedia Bingo game where players navigate from a random starting article to find 5 articles in a row on their bingo grid. Explore Wikipedia while competing on the global leaderboard!
 

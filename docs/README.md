@@ -1,6 +1,6 @@
-# Bingopedia Documentation
+# Wikibingo Documentation
 
-Welcome to the Bingopedia documentation. This directory contains active reference materials for the project.
+Welcome to the Wikibingo documentation. This directory contains active reference materials for the project.
 
 ## Essential Documents
 

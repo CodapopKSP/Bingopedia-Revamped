@@ -1,10 +1,10 @@
-## Bingopedia PRD – Wikipedia Bingo Game (Rebuild)
+## Wikibingo PRD – Wikipedia Bingo Game (Rebuild)
 
 _Last updated: Sprint 4 – Table of Contents Fixes & Mobile UX Improvements_
 
 ### 1. Background & Purpose
 
-Bingopedia is a web-based game that combines Wikipedia exploration with bingo mechanics. This PRD defines the requirements for **rebuilding** Bingopedia using the existing app and scripts as behavioral reference, not as source code.
+Wikibingo is a web-based game that combines Wikipedia exploration with bingo mechanics. This PRD defines the requirements for **rebuilding** Wikibingo using the existing app and scripts as behavioral reference, not as source code.
 
 - **Business context**: Current implementation is being retired due to tech debt and code quality issues.
 - **Scale & intent**: The product is expected to remain a **small side project**, not a heavily marketed or rapidly scaling product.

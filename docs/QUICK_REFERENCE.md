@@ -1,4 +1,4 @@
-# Bingopedia Quick Reference
+# Wikibingo Quick Reference
 
 Essential information for working on this project. For detailed specs, see `PRODUCT_PRD.md`.
 

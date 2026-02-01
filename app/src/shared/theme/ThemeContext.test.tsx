@@ -72,7 +72,7 @@ describe('ThemeContext', () => {
   })
 
   it('should load theme from localStorage', () => {
-    localStorageMock.setItem('bingopedia-theme', 'light')
+    localStorageMock.setItem('wikibingo-theme', 'light')
     window.matchMedia = vi.fn().mockImplementation(createMatchMedia(false)) // dark mode (should be ignored)
 
     const { result } = renderHook(() => useTheme(), {
@@ -95,7 +95,7 @@ describe('ThemeContext', () => {
     })
 
     expect(result.current.theme).toBe('light')
-    expect(localStorageMock.getItem('bingopedia-theme')).toBe('light')
+    expect(localStorageMock.getItem('wikibingo-theme')).toBe('light')
     expect(document.documentElement.getAttribute('data-theme')).toBe('light')
   })
 
@@ -113,14 +113,14 @@ describe('ThemeContext', () => {
     })
 
     expect(result.current.theme).toBe('light')
-    expect(localStorageMock.getItem('bingopedia-theme')).toBe('light')
+    expect(localStorageMock.getItem('wikibingo-theme')).toBe('light')
 
     act(() => {
       result.current.toggleTheme()
     })
 
     expect(result.current.theme).toBe('dark')
-    expect(localStorageMock.getItem('bingopedia-theme')).toBe('dark')
+    expect(localStorageMock.getItem('wikibingo-theme')).toBe('dark')
   })
 
   it('should update data-theme attribute when theme changes', () => {

@@ -58,7 +58,7 @@ export function StartScreen({ onStart, onCreateShareableGame, onReplay }: StartS
     <div className="bp-start-screen">
       <section className="bp-start-hero">
         <div>
-          <h2>Welcome to Bingopedia</h2>
+          <h2>Welcome to Wikibingo</h2>
           <div className="bp-start-description">
             <p>
               Start from a random Wikipedia article and navigate by clicking links to reach target articles on your 5×5 bingo card. 

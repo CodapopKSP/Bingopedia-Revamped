@@ -11,7 +11,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
-const THEME_STORAGE_KEY = 'bingopedia-theme'
+const THEME_STORAGE_KEY = 'wikibingo-theme'
 
 /**
  * Detects system color scheme preference.
