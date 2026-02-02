@@ -21,19 +21,44 @@ export function Confetti({ play, onComplete }: ConfettiProps) {
   const hasPlayedRef = useRef(false)
   const playerRef = useRef<any>(null)
   const timeoutRef = useRef<number | null>(null)
+  const completionHandlerRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     if (play && !hasPlayedRef.current && playerRef.current) {
       hasPlayedRef.current = true
+      
+      // Set up completion handler
+      completionHandlerRef.current = () => {
+        if (onComplete) {
+          onComplete()
+        }
+        if (timeoutRef.current !== null) {
+          window.clearTimeout(timeoutRef.current)
+          timeoutRef.current = null
+        }
+      }
+      
       // Try to play the animation
       if (typeof playerRef.current.play === 'function') {
         playerRef.current.play()
       }
-      // Set timeout to call onComplete after animation duration (approximately 2 seconds)
+      
+      // Listen for animation completion event if available
+      if (playerRef.current.addEventListener) {
+        playerRef.current.addEventListener('complete', completionHandlerRef.current)
+      }
+      
+      // Fallback timeout: 3.5 seconds for both mobile and desktop
+      const fallbackTimeout = 3500
+      
       if (onComplete) {
         timeoutRef.current = window.setTimeout(() => {
-          onComplete()
-        }, 2000)
+          // Only call onComplete if animation hasn't already completed
+          if (completionHandlerRef.current) {
+            completionHandlerRef.current()
+            completionHandlerRef.current = null
+          }
+        }, fallbackTimeout)
       }
     }
   }, [play, onComplete])
@@ -45,6 +70,11 @@ export function Confetti({ play, onComplete }: ConfettiProps) {
         window.clearTimeout(timeoutRef.current)
         timeoutRef.current = null
       }
+      // Remove event listener when not playing
+      if (playerRef.current && completionHandlerRef.current && playerRef.current.removeEventListener) {
+        playerRef.current.removeEventListener('complete', completionHandlerRef.current)
+      }
+      completionHandlerRef.current = null
     }
   }, [play])
 
@@ -52,6 +82,10 @@ export function Confetti({ play, onComplete }: ConfettiProps) {
     return () => {
       if (timeoutRef.current !== null) {
         window.clearTimeout(timeoutRef.current)
+      }
+      // Clean up event listener on unmount
+      if (playerRef.current && completionHandlerRef.current && playerRef.current.removeEventListener) {
+        playerRef.current.removeEventListener('complete', completionHandlerRef.current)
       }
     }
   }, [])

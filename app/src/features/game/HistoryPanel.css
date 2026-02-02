@@ -113,3 +113,12 @@
   background: var(--scrollbar-thumb-hover);
 }
 
+/* Mobile: Constrain history panel height so bottom items are visible */
+@media (max-width: 959px) {
+  .bp-history-panel {
+    flex: 0 1 auto; /* Don't grow, allow shrinking */
+    max-height: 36vh; /* Limit to 25% of viewport height */
+    min-height: 150px; /* But ensure minimum usable height */
+  }
+}
+

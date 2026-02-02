@@ -56,11 +56,8 @@ export function GameScreen({ state, controls, onBackToStart, onMatchCallbackRead
 
   const handleMatch = useCallback(() => {
     // Trigger confetti for new match
+    // The Confetti component handles its own completion timing
     setShowMatchConfetti(true)
-    // Auto-hide after animation (2 seconds)
-    setTimeout(() => {
-      setShowMatchConfetti(false)
-    }, 2000)
   }, [])
 
   // Register the match callback with parent (App.tsx) so it can pass it to useGameState
