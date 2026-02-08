@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import { AppLayout } from './AppLayout'
 import { StartScreen } from '../features/game/StartScreen'
 import { GameScreen } from '../features/game/GameScreen'
@@ -157,6 +158,7 @@ export function App() {
           )}
         </ErrorBoundary>
       </AppLayout>
+      <Analytics />
     </ThemeProvider>
   )
 }
